@@ -5,9 +5,10 @@ use crate::verify::{normalize_version, Verifier};
 use serde::{Deserialize, Serialize};
 use std::cmp::Ordering;
 
-/// The public feed is independent of the source repository.
-pub const REPOSITORY: &str = "dearaero/syncord-releases";
-/// Maximum bytes accepted for a GitHub release response.
+/// The only host the Injector talks to for updates. A constant, never data:
+/// no descriptor, setting or webview call can change where releases come from.
+pub const FEED_HOST: &str = "api.syncord.pro";
+/// Maximum bytes accepted for the signed descriptor response.
 pub const MAX_DESCRIPTOR_BYTES: u64 = 256 * 1024;
 /// Maximum signed archive size.
 pub const MAX_ASSET_BYTES: u64 = 256 * 1024 * 1024;
@@ -33,14 +34,6 @@ struct Descriptor {
     assets: Vec<Asset>,
     #[serde(skip_serializing)]
     signature: String,
-}
-
-#[derive(Debug, Deserialize)]
-struct Envelope {
-    tag_name: String,
-    draft: bool,
-    prerelease: bool,
-    body: String,
 }
 
 /// A selected release whose descriptor and signature have already passed.
@@ -107,7 +100,15 @@ pub fn compare_versions(left: &str, right: &str) -> Ordering {
     aa.len().cmp(&bb.len())
 }
 
+/// Address of the signed stable-channel descriptor.
+#[must_use]
+pub fn feed_url() -> String {
+    format!("https://{FEED_HOST}/v1/update/stable")
+}
+
 /// Validate metadata, platform binding and the Ed25519 descriptor signature.
+///
+/// The feed body *is* the signed descriptor; there is no release envelope.
 pub fn verify_release(
     bytes: &[u8],
     verifier: &Verifier,
@@ -116,23 +117,13 @@ pub fn verify_release(
     if bytes.len() as u64 > MAX_DESCRIPTOR_BYTES {
         return Err("Release information is too large.".into());
     }
-    let envelope: Envelope = serde_json::from_slice(bytes)
-        .map_err(|_| "GitHub returned invalid release information.")?;
-    if envelope.draft || envelope.prerelease {
-        return Err("The stable feed returned a draft or prerelease.".into());
-    }
-    let descriptor: Descriptor = serde_json::from_str(&envelope.body)
-        .map_err(|_| "The release has no valid signed descriptor.")?;
+    let descriptor: Descriptor = serde_json::from_slice(bytes)
+        .map_err(|_| "The update server returned invalid release information.")?;
     let normalized =
         normalize_version(&descriptor.release).ok_or("The release version is malformed.")?;
-    if descriptor.version != 1
-        || descriptor.channel != "stable"
-        || envelope.tag_name != format!("v{normalized}")
-        || normalized != descriptor.release
+    if descriptor.version != 1 || descriptor.channel != "stable" || normalized != descriptor.release
     {
-        return Err(
-            "Release tag, version or channel does not agree with the signed descriptor.".into(),
-        );
+        return Err("Release version or channel does not agree with the signed descriptor.".into());
     }
     let valid_time = descriptor
         .published_at
@@ -207,7 +198,7 @@ impl VerifiedRelease {
     #[must_use]
     pub fn download_url(&self) -> String {
         format!(
-            "https://github.com/{REPOSITORY}/releases/download/v{}/{}",
+            "https://{FEED_HOST}/v1/update/releases/{}/{}",
             self.version, self.asset.name
         )
     }

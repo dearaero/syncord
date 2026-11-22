@@ -1,4 +1,4 @@
-//! Native-only GitHub transport. No URL, header or key comes from the webview.
+//! Native-only update transport (api.syncord.pro). No URL, header or key comes from the webview.
 use reqwest::{blocking::Client, redirect::Policy, Url};
 use std::io::Read;
 use std::net::{IpAddr, ToSocketAddrs};
@@ -40,35 +40,27 @@ fn public_address_v4(v: std::net::Ipv4Addr) -> bool {
     public_address(IpAddr::V4(v))
 }
 
-pub(crate) fn allowed_url(url: &Url, asset: bool) -> bool {
+pub(crate) fn allowed_url(url: &Url) -> bool {
     url.scheme() == "https"
         && url.username().is_empty()
         && url.password().is_none()
         && url.port_or_known_default() == Some(443)
-        && match url.host_str() {
-            Some("api.github.com") => !asset,
-            Some(
-                "github.com"
-                | "release-assets.githubusercontent.com"
-                | "objects.githubusercontent.com",
-            ) => asset,
-            _ => false,
-        }
+        && url.host_str() == Some(release::FEED_HOST)
 }
 
 fn get(url: &str, limit: u64, asset: bool) -> Result<Vec<u8>, String> {
     let mut current = Url::parse(url).map_err(|_| "The release address is invalid.")?;
     for _ in 0..=3 {
-        if !allowed_url(&current, asset) {
-            return Err("GitHub redirected the request to a forbidden address.".into());
+        if !allowed_url(&current) {
+            return Err("The update server redirected the request to a forbidden address.".into());
         }
         let host = current.host_str().ok_or("The release host is absent.")?;
         let addresses: Vec<_> = (host, 443)
             .to_socket_addrs()
-            .map_err(|_| "GitHub's host could not be resolved.")?
+            .map_err(|_| "The update server could not be resolved.")?
             .collect();
         if addresses.is_empty() || addresses.iter().any(|a| !public_address(a.ip())) {
-            return Err("GitHub resolved to a private or reserved address.".into());
+            return Err("The update server resolved to a private or reserved address.".into());
         }
         let client = Client::builder()
             .https_only(true)
@@ -88,30 +80,32 @@ fn get(url: &str, limit: u64, asset: bool) -> Result<Vec<u8>, String> {
                 if asset {
                     "application/octet-stream"
                 } else {
-                    "application/vnd.github+json"
+                    "application/json"
                 },
             )
             .send()
-            .map_err(|_| "GitHub could not be reached. Check your connection and try again.")?;
+            .map_err(|_| {
+                "The update server could not be reached. Check your connection and try again."
+            })?;
         if response.status().is_redirection() {
             let location = response
                 .headers()
                 .get(reqwest::header::LOCATION)
                 .and_then(|v| v.to_str().ok())
-                .ok_or("GitHub returned a redirect with no address.")?;
+                .ok_or("The update server returned a redirect with no address.")?;
             current = current
                 .join(location)
-                .map_err(|_| "GitHub returned an invalid redirect.")?;
+                .map_err(|_| "The update server returned an invalid redirect.")?;
             continue;
         }
         if !response.status().is_success() {
             return Err(format!(
-                "GitHub returned HTTP {}. Try again later.",
+                "The update server returned HTTP {}. Try again later.",
                 response.status().as_u16()
             ));
         }
         if response.content_length().is_some_and(|n| n > limit) {
-            return Err("The GitHub response exceeds its size limit.".into());
+            return Err("The update server response exceeds its size limit.".into());
         }
         let mut bytes = Vec::new();
         response
@@ -119,22 +113,15 @@ fn get(url: &str, limit: u64, asset: bool) -> Result<Vec<u8>, String> {
             .read_to_end(&mut bytes)
             .map_err(|_| "The download was interrupted.")?;
         if bytes.len() as u64 > limit {
-            return Err("The GitHub response exceeds its size limit.".into());
+            return Err("The update server response exceeds its size limit.".into());
         }
         return Ok(bytes);
     }
-    Err("GitHub redirected too many times.".into())
+    Err("The update server redirected too many times.".into())
 }
 
 pub(crate) fn latest(verifier: &Verifier) -> Result<VerifiedRelease, String> {
-    let bytes = get(
-        &format!(
-            "https://api.github.com/repos/{}/releases/latest",
-            release::REPOSITORY
-        ),
-        release::MAX_DESCRIPTOR_BYTES,
-        false,
-    )?;
+    let bytes = get(&release::feed_url(), release::MAX_DESCRIPTOR_BYTES, false)?;
     release::verify_release(&bytes, verifier, &release::current_platform())
 }
 
@@ -204,28 +191,22 @@ mod tests {
     #[test]
     fn update_transport_does_not_accept_local_or_unrelated_destinations() {
         for url in [
-            "http://github.com/a",
-            "https://github.com:444/a",
-            "https://user:pass@github.com/a",
-            "https://github.com.evil.test/a",
+            "http://api.syncord.pro/a",
+            "https://api.syncord.pro:444/a",
+            "https://user:pass@api.syncord.pro/a",
+            "https://api.syncord.pro.evil.test/a",
             "https://127.0.0.1/a",
             "https://api.github.com/a",
+            "https://github.com/a",
+            "https://objects.githubusercontent.com/a",
         ] {
             assert!(
-                !super::allowed_url(&reqwest::Url::parse(url).unwrap(), true),
+                !super::allowed_url(&reqwest::Url::parse(url).unwrap()),
                 "{url}"
             );
         }
-        for url in [
-            "https://github.com/a",
-            "https://release-assets.githubusercontent.com/a",
-            "https://objects.githubusercontent.com/a",
-        ] {
-            assert!(super::allowed_url(&reqwest::Url::parse(url).unwrap(), true));
-        }
         assert!(super::allowed_url(
-            &reqwest::Url::parse("https://api.github.com/a").unwrap(),
-            false
+            &reqwest::Url::parse("https://api.syncord.pro/v1/update/stable").unwrap()
         ));
         for ip in [
             "127.0.0.1",
