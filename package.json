@@ -55,6 +55,6 @@
     "url": "https://github.com/dearaero/syncord.git"
   },
   "dependencies": {
-    "marked": "18.1.0"
+    "marked": "18.2.1"
   }
 }
