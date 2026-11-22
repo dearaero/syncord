@@ -1,0 +1,147 @@
+# `cargo deny` policy for the Syncord Injector.
+#
+# The repository had no Rust dependency policy before this file. That meant
+# `injector/` — the component that writes into an installed Discord — was
+# pulling in 440+ crates with nothing restricting what they are, where they come
+# from, or what licence they carry. This file is the policy, and CI enforces it.
+#
+# It is deliberately strict and deliberately reviewable: anything not named
+# here is refused, and every exception is written down with a reason next to it.
+#
+# Read alongside: `injector/README.md` (why the logic is not behind
+# `#[tauri::command]`) and `RELEASE_AND_UPDATE_PLAN.md` §4.2.
+#
+# Verify locally with: `cargo deny check` and `cargo audit`.
+
+[graph]
+# Targets to resolve. Listing them explicitly matters: without a target list
+# cargo-deny only walks the host, and a Linux-only or Windows-only transitive
+# dependency would be invisible to both the licence and the advisory check —
+# which is exactly the kind of thing that only shows up in production.
+targets = [
+    "x86_64-apple-darwin",
+    "aarch64-apple-darwin",
+    "x86_64-pc-windows-msvc",
+    "aarch64-pc-windows-msvc",
+    "x86_64-unknown-linux-gnu",
+    "aarch64-unknown-linux-gnu",
+]
+exclude = []
+
+[advisories]
+version = 2
+
+# Exactly one advisory is ignored, and it lives in the **Tauri GUI tree only**:
+#
+#   RUSTSEC-2024-0370  proc-macro-error unmaintained, build-time only
+#                     syncord-injector → tauri → …
+#
+# It is not reachable from `syncord-core`, the crate that touches the filesystem
+# and holds every guarantee in `RELEASE_AND_UPDATE_PLAN.md` §4.2. That crate's
+# eight direct dependencies are base64, ed25519-dalek, flate2, serde,
+# serde_json, sha2, tar and zip — all permissively licensed, none affected.
+#
+# `cargo deny` treats an unmaintained advisory as an error where `cargo audit`
+# treats it as a warning. Rather than downgrade the whole class — which would let
+# a *new* unmaintained crate pass silently — the single advisory is listed by
+# ID. A second one would have to be added here, where it is reviewable.
+#
+# `policy::the_pinned_advisory_list_does_not_grow` in the test suite asserts this
+# list never changes without a test change, so "just add it to the list" is not a
+# silent option.
+#
+# A *vulnerability* must never be added here. The fix is to upgrade.
+ignore = [
+    "RUSTSEC-2024-0370", # proc-macro-error: unmaintained, Tauri build tree
+]
+
+# A second advisory is visible in `cargo audit` output and deliberately NOT
+# listed here, because listing it would be dishonest:
+#
+#   RUSTSEC-2024-0429  glib::VariantStrIter unsoundness
+#
+# `cargo deny` does not flag it, correctly: the advisory is **function-scoped**
+# (`[affected.functions]` covers `next`, `nth`, `last` and their back-iterating
+# counterparts on `glib::VariantStrIter`), so it describes a defect in four
+# specific iterator methods rather than in the crate. Syncord does not call them
+# and does not depend on `glib` directly — it arrives only as
+# `syncord-injector → tauri → wry → html5ever → gtk → glib`, and is never linked
+# into a code path Syncord writes. `cargo audit` reports it as an informational
+# warning and exits 0; `cargo deny` correctly does not match it.
+#
+# Recording this here rather than suppressing it keeps the difference between
+# "we decided to ignore it" and "it does not apply" legible.
+
+[bans]
+# Multiple versions of the same crate are a supply-chain risk and always a
+# maintenance cost. Warn rather than deny: the Tauri tree legitimately carries
+# duplicates, and denying would mean vendoring or patching crates we do not
+# maintain. Every warning is printed, so the count is watchable.
+multiple-versions = "warn"
+wildcards = "allow"
+allow-wildcard-paths = false
+
+[licenses]
+# The project is ISC (`package.json`, and the workspace `license` field).
+#
+# This list is **exhaustive**: anything not named here is refused. cargo-deny
+# removed its `deny` list, which is the right default — an allowlist already
+# refuses everything else, and it fails *closed*, whereas a denylist fails open
+# the moment a dependency ships under a licence nobody thought to name.
+#
+# The strong copyleft family (GPL, AGPL, LGPL, MPL) is therefore refused by
+# omission, with one exception discussed immediately below.
+#
+# Every entry here corresponds to a licence actually present in the resolved
+# dependency graph. cargo-deny reports an "unmatched license allowance" for an
+# entry that matches nothing, so the list cannot quietly accumulate
+# hypothetical permissions.
+allow = [
+    "ISC",
+    "MIT",
+    "MIT-0",
+    "Apache-2.0",
+    "Apache-2.0 WITH LLVM-exception",
+    "0BSD",
+    "BSD-1-Clause",
+    "BSD-3-Clause",
+    "Zlib",
+    "Unicode-3.0",
+    "CC0-1.0",
+    "Unlicense",
+
+    # ── MPL-2.0, by exception ────────────────────────────────────────────
+    # Five crates: cssparser, cssparser-macros, dtoa-short, option-ext and
+    # selectors. All five arrive through one path —
+    # syncord-injector → tauri → wry → html5ever → servo/selectors — and are
+    # **not reachable from syncord-core**.
+    #
+    # MPL-2.0 is *file-level* copyleft, not project-level. Its only obligation
+    # when distributing a binary is that modifications to the MPL-covered files
+    # themselves be made available. Syncord ships them unmodified, so there is
+    # nothing to publish and nothing that reaches the Injector's own code.
+    #
+    # The alternatives were considered and are worse: the only way to avoid
+    # these five crates is to abandon the embedded webview, and the only way to
+    # avoid LGPL entirely is the same. This is a licensing decision, not a
+    # security one — refusing it would not make anything more secure.
+    #
+    # If a strong-copyleft crate ever appears in the *syncord-core* tree, that
+    # is a different question and it should fail.
+    "MPL-2.0",
+]
+
+# A licence nobody has identified is a licence we cannot comply with, so fail
+# closed rather than assume. A private crate inside this workspace is fine; a
+# private crate from elsewhere is not something we ship.
+private = { ignore = true }
+
+[sources]
+# Only crates.io. A dependency cannot be pulled from a git branch, a path
+# outside the workspace, or a registry mirror without this failing — which
+# closes the "someone's fork of a crate" supply-chain path, and also means a
+# build is reproducible from crates.io alone.
+unknown-registry = "deny"
+unknown-git = "deny"
+allow-registry = ["https://github.com/rust-lang/crates.io-index"]
+allow-git = []

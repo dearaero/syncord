@@ -1,0 +1,48 @@
+{
+  // Public template. Real account, database and admin identifiers live in the
+  // gitignored wrangler.local.jsonc (same shape); deploy with `-c wrangler.local.jsonc`.
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "syncord-api",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-10-17",
+  "workers_dev": false,
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "syncord-db",
+      "database_id": "REPLACE_WITH_D1_DATABASE_ID",
+      "migrations_dir": "migrations"
+    }
+  ],
+  "triggers": {
+    "crons": [
+      "17 * * * *"
+    ]
+  },
+  "vars": {
+    "PUBLIC_ORIGIN": "https://api.syncord.pro",
+    "DISCORD_CLIENT_ID": "1554184140704841939",
+    "ADMIN_DISCORD_IDS": "",
+    "SUPPORTER_UPLOAD_ENABLED": "true"
+  },
+  // Private Standard R2; no public bucket URL or custom domain.
+  // The actual remote Images processor is verified before enabling uploads.
+  // RELEASES: signed client payloads served at /v1/update/*. Create the bucket
+  // before the first deploy that includes this binding.
+  "r2_buckets": [
+    {"binding":"BADGE_ASSETS","bucket_name":"syncord-badge-assets"},
+    {"binding":"RELEASES","bucket_name":"syncord-releases"}
+  ],
+  "images": {"binding":"BADGE_IMAGES"},
+  "observability": {
+    "enabled": false
+  },
+  "account_id": "REPLACE_WITH_CLOUDFLARE_ACCOUNT_ID",
+  "routes": [
+    {
+      "pattern": "api.syncord.pro",
+      "custom_domain": true
+    }
+  ],
+  "send_metrics": false
+}

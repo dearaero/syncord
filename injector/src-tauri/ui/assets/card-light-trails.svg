@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="360" viewBox="0 0 1200 360" fill="none">
+<defs>
+  <radialGradient id="leftGlow"><stop stop-color="#8B53FF" stop-opacity=".48"/><stop offset=".32" stop-color="#6532F0" stop-opacity=".16"/><stop offset="1" stop-color="#3A20B0" stop-opacity="0"/></radialGradient>
+  <radialGradient id="rightGlow"><stop stop-color="#9F6BFF" stop-opacity=".24"/><stop offset="1" stop-color="#402E9C" stop-opacity="0"/></radialGradient>
+  <linearGradient id="leftStroke" x1="0" y1="340" x2="375" y2="0" gradientUnits="userSpaceOnUse"><stop stop-color="#8A45FF" stop-opacity="0"/><stop offset=".37" stop-color="#9868FF" stop-opacity=".95"/><stop offset=".72" stop-color="#BE95FF" stop-opacity=".65"/><stop offset="1" stop-color="#6C42EA" stop-opacity="0"/></linearGradient>
+  <linearGradient id="rightStroke" x1="1140" y1="0" x2="865" y2="252" gradientUnits="userSpaceOnUse"><stop stop-color="#8D50E9" stop-opacity="0"/><stop offset=".43" stop-color="#9C60FF" stop-opacity=".66"/><stop offset="1" stop-color="#704AE0" stop-opacity="0"/></linearGradient>
+  <filter id="blur24" x="-100%" y="-100%" width="300%" height="300%"><feGaussianBlur stdDeviation="25"/></filter>
+  <filter id="blur6" x="-100%" y="-100%" width="300%" height="300%"><feGaussianBlur stdDeviation="6"/></filter>
+</defs>
+<ellipse cx="105" cy="162" rx="245" ry="180" fill="url(#leftGlow)"/>
+<ellipse cx="1070" cy="95" rx="335" ry="200" fill="url(#rightGlow)"/>
+<path d="M -32 347 C 8 169 187 32 380 -11" stroke="#8146FF" stroke-opacity=".55" stroke-width="21" filter="url(#blur24)"/>
+<path d="M -32 347 C 8 169 187 32 380 -11" stroke="#8D58FF" stroke-opacity=".55" stroke-width="5.5" filter="url(#blur6)"/>
+<path d="M -32 347 C 8 169 187 32 380 -11" stroke="url(#leftStroke)" stroke-width="1.8"/>
+<path d="M 1221 -45 C 1153 37 1067 104 940 177 C 908 197 885 216 849 251" stroke="#8243E7" stroke-opacity=".3" stroke-width="16" filter="url(#blur24)"/>
+<path d="M 1221 -45 C 1153 37 1067 104 940 177 C 908 197 885 216 849 251" stroke="url(#rightStroke)" stroke-width="1.8"/>
+</svg>

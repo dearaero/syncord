@@ -1,0 +1,687 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <base href="/app/src-tauri/ui/" />
+    <link rel="stylesheet" href="design-tokens.css" />
+    <title>Syncord Injector — frontend harness</title>
+    <link rel="stylesheet" href="styles.css" />
+    <style>
+      /* Harness chrome, not part of the app. */
+      #harness-out {
+        margin: 20px;
+        padding: 12px;
+        border: 1px solid #888;
+        font-family: ui-monospace, monospace;
+        font-size: 12px;
+        white-space: pre-wrap;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="app-shell">
+    <header class="topbar" data-tauri-drag-region>
+      <div class="brand" data-tauri-drag-region>
+        <img class="brand-mark" src="assets/syncord-app-icon.png" width="48" height="48" alt="" data-tauri-drag-region />
+        <div class="brand-copy" data-tauri-drag-region>
+          <strong data-tauri-drag-region>Syncord Injector</strong>
+          <small id="injector-version" data-tauri-drag-region>loading…</small>
+        </div>
+      </div>
+      <div class="window-actions">
+        <button type="button" class="window-button rescan" id="rescan" aria-label="Rescan Discord clients" title="Rescan Discord clients"><span class="control-icon icon-rescan" aria-hidden="true"></span></button>
+        <div class="window-controls" role="group" aria-label="Window controls">
+          <button type="button" class="window-button" id="window-minimize" aria-label="Minimize" title="Minimize"><span class="control-icon icon-minimize" aria-hidden="true"></span></button>
+          <button type="button" class="window-button" id="window-maximize" aria-label="Maximize or restore" title="Maximize or restore"><span class="control-icon icon-maximize" aria-hidden="true"></span></button>
+          <button type="button" class="window-button window-close" id="window-close" aria-label="Close" title="Close"><span class="control-icon icon-close" aria-hidden="true"></span></button>
+        </div>
+      </div>
+    </header>
+
+    <main>
+      <!--
+        The payload banner. Shown before the install list because it decides
+        whether the Inject buttons can work at all, and a user who clicks and
+        then reads an error has been told less than a user who reads this first.
+      -->
+      <section class="banner" id="payload-banner" hidden>
+        <span class="banner-icon" aria-hidden="true">!</span>
+        <p id="payload-message"></p>
+      </section>
+
+      <!--
+        A label and a count, not a heading and a paragraph. The count is the
+        only part that changes between renders, and the only part worth reading
+        before deciding what to press.
+      -->
+      <p id="summary" class="sr-only" role="status" aria-live="polite">Looking for Discord…</p>
+
+      <ul class="installs" id="installs"></ul>
+
+      <section class="empty" id="empty" hidden>
+        <h2>No Discord client found</h2>
+        <p>
+          Syncord installs into an existing Discord. Install Discord from
+          discord.com, close it, then press <strong>Rescan</strong>.
+        </p>
+        <p class="muted">
+          The Microsoft Store build on Windows and Snap on Linux are not supported.
+        </p>
+      </section>
+    </main>
+    </div>
+
+    <!--
+      A native <dialog> rather than a styled div. Escape closes it, focus is
+      trapped, and the browser supplies the semantics — none of which a div and a
+      keydown handler get right by default.
+    -->
+    <dialog id="confirm" class="confirm">
+      <h2 id="confirm-title">Remove Syncord?</h2>
+      <p id="confirm-body"></p>
+      <div class="confirm-actions">
+        <button type="button" class="ghost" id="confirm-cancel">Cancel</button>
+        <button type="button" class="danger" id="confirm-accept">Uninject</button>
+      </div>
+    </dialog>
+
+    <!--
+      The permission helper.
+
+      Shown *before* the user presses anything, and again if a write is refused.
+      Its whole purpose is that the common cause on macOS is a privacy setting
+      the user has to find and change, and finding that out by way of a failed
+      inject — with a message that used to name the wrong setting and suggest a
+      command belonging to a different program — is the version that wastes
+      their time.
+    -->
+    <dialog id="permission" class="permission">
+      <h2 id="permission-title">This Discord cannot be changed yet</h2>
+      <p id="permission-body"></p>
+      <div class="permission-actions">
+        <button type="button" class="ghost" id="permission-close">Close</button>
+        <button type="button" class="ghost" id="permission-recheck">Check again</button>
+        <button type="button" class="primary" id="permission-open" hidden>Open System Settings</button>
+      </div>
+    </dialog>
+
+    <div class="toast" id="toast" hidden role="status" aria-live="polite">
+      <p id="toast-message"></p>
+      <p class="toast-help" id="toast-help" hidden></p>
+      <button type="button" class="ghost" id="toast-close" aria-label="Dismiss">×</button>
+    </div>
+
+        <div id="harness-out">running…</div>
+
+    <script>
+      /*
+       * The Tauri bridge, stubbed.
+       *
+       * `app.js` reads `window.__TAURI__.core.invoke`, so this is the only seam
+       * between the frontend and Rust. The responses below are the exact JSON
+       * shapes `state.rs` serialises — `Startup`, `InstallRow`, `ActionResult` —
+       * which is what makes this a test of the *contract* rather than of a
+       * fixture someone invented.
+       */
+      const calls = [];
+      let nextResponse = null;
+
+      window.__windowCalls = [];
+      window.__TAURI__ = {
+        window: { getCurrentWindow: () => ({ minimize: async()=>window.__windowCalls.push("minimize"), toggleMaximize: async()=>window.__windowCalls.push("toggleMaximize"), close: async()=>window.__windowCalls.push("close") }) },
+        core: {
+          invoke(command, args) {
+            calls.push({ command, args });
+            if (nextResponse) {
+              const response = nextResponse;
+              nextResponse = null;
+              return response instanceof Error ? Promise.reject(response) : Promise.resolve(response);
+            }
+            return Promise.resolve(defaultResponse(command));
+          },
+        },
+      };
+
+      // Exposed so the assertions can see exactly what the frontend sent. If a
+      // command name drifts between `state.rs` and `app.js`, this is where it
+      // shows up.
+      window.__harnessCalls = () => calls;
+
+      function defaultResponse(command) {
+        if (command === "startup" || command === "rescan" || command === "check_updates") return state;
+        return { ok: true, message: "ok", help: null };
+      }
+
+      // Matches `InstallRow` / `Startup` as serialised by serde with
+      // `rename_all = "camelCase"`.
+      let state = {
+        installs: [
+          {
+            index: 0,
+            branch: "stable",
+            label: "Discord",
+            path: "/Applications/Discord.app/Contents/Resources",
+            injected: true,
+            launchReady: true,
+            version: "1.4.0",
+            fingerprint: "fa9473bffc1d",
+            verified: true,
+            access: "writable",
+            accessHint: null,
+          },
+          {
+            index: 1,
+            branch: "canary",
+            label: "Discord Canary",
+            // A path containing markup. Nothing may ever interpolate this.
+            path: '/Applications/<img src=x onerror="alert(1)">/Resources',
+            injected: false,
+            launchReady: false,
+            version: null,
+            fingerprint: null,
+            verified: false,
+            access: "writable",
+            accessHint: null,
+          },
+          {
+            index: 2,
+            branch: "ptb",
+            label: "Discord PTB",
+            path: "/Applications/Discord PTB.app/Contents/Resources",
+            injected: true,
+            launchReady: true,
+            version: "1.3.0",
+            fingerprint: "aa11bb22cc33",
+            verified: false,
+            access: "writable",
+            accessHint: null,
+          },
+        ],
+        payloadVersion: "1.4.0",
+        payloadUnavailable: null,
+        injectorVersion: "0.1.0",
+      };
+    </script>
+
+    <script>
+      // Surface a thrown error instead of leaving the harness at "running…",
+      // which is indistinguishable from "the module never loaded".
+      window.addEventListener("error", (e) => {
+        const out = document.getElementById("harness-out");
+        out.textContent = `FAIL harness error: ${e.message}\n${e.error?.stack ?? ""}`;
+        document.title = "HARNESS-FAILED";
+      });
+      window.addEventListener("unhandledrejection", (e) => {
+        const out = document.getElementById("harness-out");
+        out.textContent = `FAIL harness rejection: ${e.reason}\n${e.reason?.stack ?? ""}`;
+        document.title = "HARNESS-FAILED";
+      });
+    </script>
+
+    <script type="module">
+      try {
+      /* Load the real frontend. */
+      await import("/app/src-tauri/ui/app.js");
+
+      const out = document.getElementById("harness-out");
+      const results = [];
+      const check = (name, condition, detail = "") => {
+        results.push(`${condition ? "PASS" : "FAIL"} ${name}${detail ? ` — ${detail}` : ""}`);
+        out.textContent = results.join("\n");
+        document.title = results.some((r) => r.startsWith("FAIL")) ? "HARNESS-FAILED" : "HARNESS-DONE";
+      };
+
+      const $ = (sel) => document.querySelector(sel);
+      const rows = () => [...document.querySelectorAll("#installs .install")];
+      const rowAt = (i) => rows()[i];
+
+      // Give app.js a turn to run its initial `refresh()`.
+      await new Promise((r) => setTimeout(r, 60));
+
+      /* ── Initial render ──────────────────────────────────────────────────── */
+
+      check("startup was called on load", window.__harnessCalls().some((c) => c.command === "startup"));
+
+      check("one row per install", rows().length === 3, `got ${rows().length}`);
+
+      check(
+        "branch labels come from the payload",
+        rows().map((r) => r.querySelector(".install-name").textContent).join("|") ===
+          "Discord|Discord Canary|Discord PTB",
+      );
+
+      check("version is shown in the top bar", $("#injector-version").textContent === "v0.1.0");
+
+      check(
+        "summary separates ready installs from repairs",
+        $("#summary").textContent === "Found 3 · Ready in 1 · Repair needed in 1.",
+        $("#summary").textContent,
+      );
+
+      check(
+        "a non-empty list is visible, because the list is a bordered card",
+        !$("#installs").hidden,
+        "an empty bordered card above the rows reads as a rendering fault",
+      );
+
+      /* ── The three status states ─────────────────────────────────────────── */
+
+      const badges = rows().map((r) => r.querySelector(".badge").textContent);
+      check("installed + verified badge names the version", badges[0] === "Installed · v1.4.0", badges[0]);
+      check("not-installed badge", badges[1] === "Not installed", badges[1]);
+      check(
+        "installed but unverified is its own state, and does not say 'modified'",
+        badges[2] === "Unverified — reinstall" && !badges[2].includes("Modified"),
+        badges[2],
+      );
+
+      check(
+        "the broken install's badge is styled as a warning",
+        rowAt(2).querySelector(".badge").className.includes("is-pending"),
+      );
+
+      check(
+        "a build note shows the fingerprint and the verification state",
+        rowAt(0).querySelector(".install-note").textContent.includes("signature verified") &&
+          rowAt(0).querySelector(".install-note").textContent.includes("fa9473bffc1d"),
+      );
+      const brokenNote = rowAt(2).querySelector(".install-note");
+      check(
+        "an unverified install says so in the note",
+        brokenNote !== null && brokenNote.textContent.includes("could not be verified"),
+        brokenNote ? brokenNote.textContent : "no note rendered",
+      );
+
+      /* ── Buttons ─────────────────────────────────────────────────────────── */
+
+      check(
+        "an injected row offers Update, Uninject and an explicit offline install",
+        rowAt(0).querySelectorAll(".install-actions button").length === 3 &&
+          rowAt(0).querySelector("button.primary").textContent === "Update" &&
+          rowAt(0).querySelector("button.ghost").textContent === "Uninject",
+      );
+      check(
+        "a clean row offers Inject and the explicit offline install, without Uninject",
+        rowAt(1).querySelectorAll(".install-actions button").length === 2 &&
+          rowAt(1).querySelector("button.primary").textContent === "Inject" &&
+          rowAt(1).querySelector("button.secondary").textContent === "Install bundled 1.4.0" &&
+          rowAt(1).querySelector("button.ghost") === null,
+      );
+
+      await Promise.all([...document.images].map(img=>img.decode().catch(()=>{})));
+      check('new application logo and detected-client tiles load from local assets',document.querySelector('.brand-mark').naturalWidth===1024&&[...document.querySelectorAll('.client-tile')].every(img=>img.naturalWidth>0));
+      const more=rowAt(0).querySelector('.more-button'),menu=rowAt(0).querySelector('.install-actions');
+      check('actions start hidden behind one labelled menu trigger', menu.hidden && more.getAttribute('aria-expanded')==='false' && more.getAttribute('aria-controls')===menu.id);
+      more.click();check('menu opens with keyboard focus on its first available action', !menu.hidden && document.activeElement===menu.querySelector('button:not(:disabled)'));
+      const bounds=menu.getBoundingClientRect();check('floating menu stays inside the viewport',bounds.left>=0&&bounds.top>=0&&bounds.right<=innerWidth&&bounds.bottom<=innerHeight);
+      const menuButtons=[...menu.querySelectorAll('button')];check('actions stack vertically',menuButtons[0].getBoundingClientRect().bottom<=menuButtons[1].getBoundingClientRect().top);
+      document.dispatchEvent(new KeyboardEvent('keydown',{key:'End',bubbles:true}));check('End reaches the last menu action',document.activeElement===menuButtons.at(-1));
+      document.dispatchEvent(new KeyboardEvent('keydown',{key:'Escape',bubbles:true}));check('Escape closes and returns focus',menu.hidden&&document.activeElement===more);
+      more.click();document.body.dispatchEvent(new PointerEvent('pointerdown',{bubbles:true}));check('outside click closes menu',menu.hidden);
+      more.dispatchEvent(new KeyboardEvent('keydown',{key:'ArrowDown',bubbles:true}));check('ArrowDown opens menu',!menu.hidden);window.dispatchEvent(new Event('resize'));check('resize closes floating menu',menu.hidden);
+      for(const id of ['window-minimize','window-maximize','window-close'])document.getElementById(id).click();await new Promise(r=>setTimeout(r,0));check('titlebar buttons reach the real Tauri window method names',window.__windowCalls.join(',')==='minimize,toggleMaximize,close');
+
+      /* ── XSS: a path is text, never markup ───────────────────────────────── */
+
+      check(
+        "a path containing markup is inserted as text, not parsed",
+        !document.querySelector("#installs img[src=x]") && document.querySelectorAll("#installs img").length === state.installs.length && rowAt(1).querySelector(".install-path").textContent.includes("<img"),
+      );
+
+      /* ── Inject ───────────────────────────────────────────────────────────── */
+
+      // The last call the frontend made. Read from the stub's own log rather
+      // than by patching: `app.js` binds `invoke` once at module load, so a
+      // later patch of the object would be ignored.
+      const lastCall = (command) => {
+        const log = window.__harnessCalls();
+        return [...log].reverse().find((c) => c.command === command) ?? null;
+      };
+
+      rowAt(1).querySelector("button.primary").click();
+      await new Promise((r) => setTimeout(r, 60));
+
+      const injectCall = lastCall("inject_into");
+      check("Inject sends inject_into", injectCall !== null);
+      check(
+        "and the only argument is the index, not a path",
+        JSON.stringify(injectCall?.args) === '{"index":1}',
+        JSON.stringify(injectCall?.args),
+      );
+
+      check(
+        "a success shows a success toast",
+        !$("#toast").hidden && $("#toast").classList.contains("is-success"),
+        $("#toast-message").textContent,
+      );
+
+      let finishWrite;nextResponse=new Promise(resolve=>finishWrite=resolve);
+      const beforeBusy=window.__harnessCalls().filter(c=>c.command==='inject_into').length;
+      const installButton=rowAt(1).querySelector('button.primary');installButton.click();installButton.click();$('#rescan').click();
+      check('writes and Rescan cannot overlap or double-submit',window.__harnessCalls().filter(c=>c.command==='inject_into').length===beforeBusy+1&&$('#rescan').disabled&&rowAt(1).getAttribute('aria-busy')==='true');
+      finishWrite({ok:true,message:'Finished once'});await new Promise(r=>setTimeout(r,60));
+
+      /* ── A refusal, with help text ────────────────────────────────────────── */
+
+      nextResponse = { ok: false, message: "cannot write to /x", help: "Quit Discord, then run the command again." };
+      rowAt(1).querySelector("button.primary").click();
+      await new Promise((r) => setTimeout(r, 60));
+
+      check("a refusal shows an error toast", $("#toast").classList.contains("is-error"));
+      check("the refusal message is shown", $("#toast-message").textContent === "cannot write to /x");
+      check(
+        "the help text is shown, because it is the part with the fix",
+        !$("#toast-help").hidden && $("#toast-help").textContent.includes("Quit Discord"),
+      );
+
+      /* ── A thrown command ─────────────────────────────────────────────────── */
+
+      nextResponse = new Error("boom");
+      rowAt(1).querySelector("button.primary").click();
+      await new Promise((r) => setTimeout(r, 60));
+      check("a rejected command is reported, not swallowed", $("#toast").classList.contains("is-error"));
+      check("and it says the Injector could not complete it", $("#toast-message").textContent.includes("could not complete"));
+
+      /* ── Uninject and its confirmation ────────────────────────────────────── */
+
+      rowAt(0).querySelector("button.ghost").click();
+      await new Promise((r) => setTimeout(r, 60));
+
+      const dialog = $("#confirm");
+      check("Uninject asks for confirmation first", dialog.open, "the dialog should be modal");
+      check("the dialog names the client", $("#confirm-body").textContent.includes("Discord"));
+      check("nothing was sent while awaiting confirmation", lastCall("uninject_from") === null);
+
+      $("#confirm-cancel").click();
+      await new Promise((r) => setTimeout(r, 40));
+      check(
+        "cancelling sends nothing and closes the dialog",
+        !dialog.open && lastCall("uninject_from") === null,
+      );
+
+      rowAt(0).querySelector("button.ghost").click();
+      await new Promise((r) => setTimeout(r, 40));
+      // Reproduce a queued native close event from the previous dialog.
+      dialog.dispatchEvent(new Event("close"));
+      check("a stale close event preserves the next confirmation", dialog.open);
+      $("#confirm-accept").click();
+      await new Promise((r) => setTimeout(r, 60));
+      const uninjectCall = lastCall("uninject_from");
+      check("confirming sends uninject_from for that row", uninjectCall !== null);
+      check("with only the index", JSON.stringify(uninjectCall?.args) === '{"index":0}', JSON.stringify(uninjectCall?.args));
+
+      /* ── Rescan ───────────────────────────────────────────────────────────── */
+
+      $("#rescan").click();
+      await new Promise((r) => setTimeout(r, 60));
+      check("Rescan calls the rescan command", lastCall("rescan") !== null);
+      check("and the list is still rendered afterwards", rows().length === 3);
+
+      /* ── No payload available ─────────────────────────────────────────────── */
+
+      state = { ...state, payloadVersion: null, payloadUnavailable: "This build has no payload beside it." };
+      nextResponse = state;
+      $("#rescan").click();
+      await new Promise((r) => setTimeout(r, 80));
+
+      check("a missing payload shows a banner", !$("#payload-banner").hidden);
+      check("the banner carries the reason", $("#payload-message").textContent.includes("no payload"));
+      check(
+        "and Install is disabled, so the button cannot be pressed",
+        [...document.querySelectorAll("#installs button.primary")].every((b) => b.disabled),
+      );
+      check("Uninject stays enabled — removing does not need a payload", ![...document.querySelectorAll("#installs button.ghost")].some((b) => b.disabled));
+
+      /* ── A refused write: the helper, before the user presses anything ──────── */
+
+      // The point of measuring write access is that the user learns the cause
+      // *before* pressing Inject. This is the state that measurement produces on
+      // a stock macOS machine, where App Management blocks the write.
+      //
+      // Built from explicit rows rather than inherited from the tests above: the
+      // earlier blocks deliberately break `state` (no payload, empty list) to
+      // check their own edges, and a test that depends on the wreckage of
+      // another test is a test that breaks for reasons unrelated to its subject.
+      const ACCESS_HINT =
+        "macOS has not allowed this app to change the Discord application.\n\n" +
+        "Open System Settings, then Privacy & Security, then App Management.";
+
+      const cleanRow = {
+        branch: "stable",
+        label: "Discord",
+        path: "/Applications/Discord.app/Contents/Resources",
+        injected: true,
+        version: "1.4.0",
+        fingerprint: "fa9473bffc1d",
+        verified: true,
+        access: "writable",
+        accessHint: null,
+      };
+      const blockedRow = {
+        branch: "canary",
+        label: "Discord Canary",
+        path: "/Applications/Discord Canary.app/Contents/Resources",
+        injected: false,
+        version: null,
+        fingerprint: null,
+        verified: false,
+        access: "appManagement",
+        accessHint: ACCESS_HINT,
+      };
+      const withAccess = (installs) => ({
+        ...state,
+        payloadVersion: "1.4.0",
+        payloadUnavailable: null,
+        installs,
+      });
+
+      nextResponse = withAccess([blockedRow, { ...cleanRow }]);
+      $("#rescan").click();
+      await new Promise((r) => setTimeout(r, 80));
+
+      check(
+        "a row whose write is refused says so, instead of just disabling the button",
+        rowAt(0).classList.contains("is-blocked") &&
+          rowAt(0).querySelector(".access-note") !== null,
+      );
+      check(
+        "and the note names the cause rather than saying 'permission denied'",
+        rowAt(0).querySelector(".access-note").textContent.includes("macOS"),
+        rowAt(0).querySelector(".access-note").textContent,
+      );
+      check(
+        "Inject is withheld, because the refusal is a known, fixable cause",
+        rowAt(0).querySelector("button.primary").disabled,
+      );
+      check(
+        "and the row offers the way to fix it",
+        rowAt(0).querySelector(".access-note button") !== null,
+      );
+      check(
+        "a row that is not blocked is not marked, and keeps its action",
+        !rowAt(1).classList.contains("is-blocked") &&
+          !rowAt(1).querySelector("button.primary").disabled,
+      );
+      check(
+        "an unblocked row has no access note to read past",
+        rowAt(1).querySelector(".access-note") === null,
+      );
+
+      /* ── The helper dialog ────────────────────────────────────────────────── */
+
+      rowAt(0).querySelector(".access-note button").click();
+      await new Promise((r) => setTimeout(r, 40));
+
+      check("the helper opens when the fix is asked for", $("#permission").open);
+      check(
+        "it names the cause in its title",
+        $("#permission-title").textContent.includes("macOS"),
+        $("#permission-title").textContent,
+      );
+      check("and carries the measured guidance", $("#permission-body").textContent.includes("App Management"));
+
+      // The frontend asks for a *named* pane. A window that could be told to
+      // open an address would be a link opener, and that is the reason the shell
+      // plugin is not granted.
+      check(
+        "and offers to open the right settings screen",
+        !$("#permission-open").hidden,
+        "App Management is fixable in a pane, so the button must be offered",
+      );
+      $("#permission-open").click();
+      await new Promise((r) => setTimeout(r, 40));
+      const openCall = lastCall("open_settings");
+      check("opening the pane goes through a command", openCall !== null);
+      check(
+        "and names a pane rather than passing a URL",
+        JSON.stringify(openCall?.args) === '{"pane":"appManagement"}',
+        JSON.stringify(openCall?.args),
+      );
+
+      /* ── A cause with no settings pane behind it ──────────────────────────── */
+
+      // Pointing someone at App Management because their install is owned by
+      // root would send them to a screen that cannot possibly help.
+      nextResponse = withAccess([
+        { ...blockedRow, access: "directoryPermissions", accessHint: "This Discord belongs to another account." },
+      ]);
+      $("#rescan").click();
+      await new Promise((r) => setTimeout(r, 40));
+      rowAt(0).querySelector(".access-note button").click();
+      await new Promise((r) => setTimeout(r, 40));
+      check(
+        "a cause with no pane does not offer a button to open one",
+        $("#permission-open").hidden,
+      );
+      check(
+        "and the steps are shown instead",
+        $("#permission-body").textContent.includes("another account"),
+        $("#permission-body").textContent,
+      );
+      $("#permission-close").click();
+      await new Promise((r) => setTimeout(r, 20));
+
+      /* ── Check again: the refusal goes away once the setting is granted ────── */
+
+      // The user leaves for System Settings, grants it, comes back. Without a
+      // re-measure the window would still say the write is refused, and there
+      // would be no way to tell a setting that did not work from a window that
+      // never looked.
+      nextResponse = withAccess([{ ...cleanRow }]);
+      nextResponse = withAccess([{ ...blockedRow }]);
+      $("#rescan").click();
+      await new Promise((r) => setTimeout(r, 60));
+      rowAt(0).querySelector(".access-note button").click();
+      await new Promise((r) => setTimeout(r, 40));
+      check("the helper is open before re-checking", $("#permission").open);
+
+      nextResponse = withAccess([{ ...cleanRow }]);
+      $("#permission-recheck").click();
+      await new Promise((r) => setTimeout(r, 80));
+
+      check("re-checking re-measures rather than re-reading a cache", lastCall("check_write_access") !== null);
+      check("and the dialog closes once nothing is blocked", !$("#permission").open);
+      check(
+        "and the row is usable again",
+        !rowAt(0).classList.contains("is-blocked") &&
+          !rowAt(0).querySelector("button.primary").disabled,
+      );
+      check(
+        "and it says so, rather than closing silently",
+        $("#toast").classList.contains("is-success"),
+        $("#toast-message").textContent,
+      );
+
+      /* ── A refusal that names a pane opens the helper by itself ───────────── */
+
+      // The row can be wrong about the cause: the measurement was taken before
+      // the user pressed. A refusal that carries a pane is the backend saying
+      // "here is where the fix is", and a toast that disappears is not enough
+      // for a change the user has to go and make.
+      nextResponse = withAccess([{ ...cleanRow }]);
+      $("#rescan").click();
+      await new Promise((r) => setTimeout(r, 60));
+
+      nextResponse = {
+        ok: false,
+        message: "cannot write to /Applications/Discord.app/Contents/Resources",
+        help: "Open System Settings, then Privacy & Security, then App Management.",
+        pane: "appManagement",
+      };
+      rowAt(0).querySelector("button.primary").click();
+      await new Promise((r) => setTimeout(r, 80));
+
+      check(
+        "a refusal with a settings pane opens the helper, not only a toast",
+        $("#permission").open,
+      );
+      check("and the helper offers that pane", !$("#permission-open").hidden);
+      $("#permission-close").click();
+      await new Promise((r) => setTimeout(r, 20));
+      check("and Close dismisses it", !$("#permission").open);
+
+      // Verified bundles can still be hidden behind Discord's restored app.asar.
+      state = { ...state, payloadVersion: "1.4.0", payloadUnavailable: null, installs: [{ ...state.installs[0], injected: true,
+        verified: true, launchReady: false, access: "writable", accessHint: null }] };
+      nextResponse = state;
+      $("#rescan").click();
+      await new Promise((r) => setTimeout(r, 80));
+      check("a shadowed loader is reported as needing repair", rowAt(0).querySelector(".badge").textContent === "Repair required");
+      check("a shadowed loader offers Repair instead of Update", rowAt(0).querySelector("button.primary").textContent === "Repair");
+      check("the summary does not call a shadowed loader ready", $("#summary").textContent.includes("Ready in 0") && $("#summary").textContent.includes("Repair needed in 1"));
+
+      /* ── Empty state ──────────────────────────────────────────────────────── */
+
+      state = { ...state, installs: [], payloadVersion: "1.4.0", payloadUnavailable: null };
+      nextResponse = state;
+      $("#rescan").click();
+      await new Promise((r) => setTimeout(r, 80));
+      check("an empty machine shows the empty state", !$("#empty").hidden && rows().length === 0);
+      check(
+        "and the list card is hidden, not left as an empty 1px rectangle",
+        $("#installs").hidden,
+        "the empty state and an empty bordered card together look broken",
+      );
+      check("and the banner is hidden when a payload exists", $("#payload-banner").hidden);
+
+      /* ── A response that cannot be rendered ────────────────────────────────── */
+
+      // Not a fixture Rust would send: `installs` is always present. It is the
+      // shape of a *rejected* command, and the point is what the window claims
+      // afterwards. `renderBanner` runs before `renderInstalls`, so without care
+      // a failure in the list leaves the banner asserting "no verified payload
+      // is available" — a confident, wrong diagnosis the user would go and act
+      // on. What is unknown must not be reported as absent.
+      nextResponse = new Error("backend went away");
+      $("#rescan").click();
+      await new Promise((r) => setTimeout(r, 80));
+
+      check(
+        "a failed read does not leave a payload banner claiming the wrong cause",
+        $("#payload-banner").hidden,
+        `banner text: ${$("#payload-message").textContent}`,
+      );
+      check(
+        "and the summary names the failure",
+        $("#summary").textContent === "Rescan failed.",
+        $("#summary").textContent,
+      );
+      check("and the failure is reported in the toast", $("#toast").classList.contains("is-error"));
+      check(
+        "a failed read leaves no rows behind, rather than the previous scan's",
+        rows().length === 0 && $("#empty").hidden,
+        "half-applied state: stale rows from the last good scan stay clickable",
+      );
+      check("and the list card is hidden too", $("#installs").hidden);
+
+      const failures = results.filter((r) => r.startsWith("FAIL"));
+      document.title = failures.length ? `HARNESS-FAILED:${failures.length}` : `HARNESS-DONE:${results.length}`;
+      out.textContent += `\n\n${results.length - failures.length}/${results.length} passed`;
+      } catch (err) {
+        const out = document.getElementById("harness-out");
+        out.textContent = `FAIL harness threw: ${err && err.message}\n${err && err.stack}`;
+        document.title = "HARNESS-FAILED";
+      }
+    </script>
+  </body>
+</html>

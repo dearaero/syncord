@@ -1,0 +1,101 @@
+# Paths where a mistake is a security incident rather than a bug.
+# Requiring a review on these is the control; the list is the mechanism.
+#
+# Note on scope: these are the files where an *accident* is dangerous. A change
+# to the permission model or the origin matcher is a security decision even when
+# it is only a few lines, and a one-line diff to a security predicate is exactly
+# the kind of thing a review queue should not wave through.
+
+# ── Preload and IPC boundaries ───────────────────────────────────────────────
+/src/preload/                 @Syncord/maintainers
+/src/main/ipc.ts              @Syncord/maintainers
+/src/shared/native.ts         @Syncord/maintainers
+/src/shared/constants.ts      @Syncord/maintainers
+
+# ── The whole security subsystem ─────────────────────────────────────────────
+/src/security/                @Syncord/maintainers
+/src/main/security/           @Syncord/maintainers
+
+# ── The injection point: this file decides what code runs before Discord ─────
+/src/main/index.ts            @Syncord/maintainers
+/src/main/patchBrowserWindow.ts  @Syncord/maintainers
+/src/main/enableDevTools.ts   @Syncord/maintainers
+
+# ── Plugin system: every plugin is a privilege grant ─────────────────────────
+/src/renderer/api/plugin/     @Syncord/maintainers
+/src/renderer/plugins/        @Syncord/maintainers
+
+# ── Release policy: the rules auto-update trusts ─────────────────────────────
+# These two files decide what a release *is* and whether it is newer. A change
+# here can turn "we only install a signed newer build" into "we install whatever
+# the feed says", so they are the highest-traffic review target after the
+# injection point itself.
+/src/shared/release.ts          @Syncord/maintainers
+/src/shared/version.ts          @Syncord/maintainers
+
+# ── Privileged UI surface ────────────────────────────────────────────────────
+/src/renderer/ui/permissionPrompt.ts  @Syncord/maintainers
+/src/renderer/ui/securityCenter.ts    @Syncord/maintainers
+/src/renderer/ui/updatePrompt.ts      @Syncord/maintainers
+/src/renderer/api/updater.ts         @Syncord/maintainers
+
+# ── Build, inject and supply chain ───────────────────────────────────────────
+/scripts/inject.mjs           @Syncord/maintainers
+/scripts/build.mjs            @Syncord/maintainers
+/scripts/security-scan.mjs    @Syncord/maintainers
+# The only two files in the repository that ever hold the release signing key.
+# Both read Syncord_SIGNING_KEY and both re-verify their own output from disk
+# with the public half before writing anything, so a bug here cannot produce a
+# signed artifact that does not match the bundles it describes.
+/scripts/release.mjs          @Syncord/maintainers
+/scripts/sign-payload.mjs     @Syncord/maintainers
+
+# The release gates. `package-payload.mjs` reads the Injector's payload
+# allowlist out of `archive.rs` and refuses to produce an archive the Injector
+# would reject, which is a security control crossing a language boundary.
+# `verify-artifacts.mjs` re-hashes every artifact against the index beside it
+# immediately before publishing; without it a digest that no longer describes
+# the bytes produces a signed release descriptor that every client declines,
+# silently.
+/scripts/package-payload.mjs  @Syncord/maintainers
+/scripts/verify-artifacts.mjs @Syncord/maintainers
+/package.json                 @Syncord/maintainers
+/pnpm-lock.yaml               @Syncord/maintainers
+/pnpm-workspace.yaml          @Syncord/maintainers
+
+# ── The standalone Injector ───────────────────────────────────────────────────
+# Rust, and deliberately outside scripts/security-scan.mjs's reach (it only
+# walks src/ and scripts/ for .ts/.js/.mjs). It is the component that writes
+# into a Discord install, so it needs the same review bar as patchBrowserWindow.
+#
+# Its CI coverage is cargo clippy + cargo test + cargo audit + cargo deny, plus
+# CodeQL with the Rust language enabled. That is the whole automated gate on
+# this code, so every one of those checks has to keep passing.
+#
+# Three files inside it are named individually because a mistake in them is a
+# security decision rather than a bug, even though a diff to each is small:
+#
+#   deny.toml            the licence/source/advisory policy. Widening an
+#                        `ignore` entry or an `allow` licence is a decision
+#                        someone has to make deliberately, and
+#                        `crates/syncord-core/src/tests/policy.rs` is written to
+#                        fail the build when it changes shape.
+#   src-tauri/capabilities/default.json
+#                        the Tauri permission set. It is currently exactly
+#                        `core:default`, so the frontend has no fs, shell or
+#                        http plugin and cannot read a file, run a process or
+#                        open a socket even if fully compromised. Adding a
+#                        permission is a security change.
+#   src-tauri/src/state.rs
+#                        the command surface. No command may accept a
+#                        filesystem path; they take an index into a list
+#                        discovered at startup, which is the property that lets
+#                        capabilities/default.json stay minimal.
+#
+/injector/deny.toml                     @Syncord/maintainers
+/injector/src-tauri/capabilities/       @Syncord/maintainers
+/injector/src-tauri/src/state.rs        @Syncord/maintainers
+/injector/                              @Syncord/maintainers
+
+# ── CI and signing configuration ─────────────────────────────────────────────
+/.github/                     @Syncord/maintainers

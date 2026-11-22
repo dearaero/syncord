@@ -1,0 +1,20 @@
+{
+  "name": "syncord-ecosystem-service",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "wrangler dev --local",
+    "migrate:local": "wrangler d1 migrations apply syncord-db --local",
+    "migrate:remote": "wrangler d1 migrations apply syncord-db --remote -c wrangler.local.jsonc",
+    "deploy": "wrangler deploy -c wrangler.local.jsonc",
+    "typecheck": "pnpm -C ../.. exec tsc -p services/ecosystem/tsconfig.json",
+    "provision": "node scripts/provision.mjs",
+    "verify:live": "node scripts/verify-live.mjs"
+  },
+  "devDependencies": {
+    "wrangler": "4.151.1"
+  },
+  "dependencies": {
+    "saxes": "6.0.0"
+  }
+}

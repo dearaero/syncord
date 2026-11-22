@@ -1,0 +1,30 @@
+node_modules/
+dist/
+.DS_Store
+*.log
+.env
+.env.*
+.cursor
+.changes
+# Transient fixtures written by the static-scan tests; removed on completion.
+.scan-fixtures/
+# Release artifacts. Signed with a release key, produced by
+# `scripts/package-payload.mjs` and `scripts/release.mjs`. Generated here and
+# nowhere else: a committed release archive is one nobody re-verified.
+release/
+
+# Scratch directories for the release packagers. Named so they are obvious if a
+# run is interrupted, and ignored so an interrupted run cannot be mistaken for
+# source.
+.package-*
+
+# Local Workers/D1 development databases and OAuth secrets.
+services/ecosystem/.wrangler/
+services/ecosystem/.dev.vars
+services/ecosystem/.dev.vars.*
+# Real Cloudflare account/database/admin identifiers. Never commit.
+services/ecosystem/wrangler.local.jsonc
+
+# Markdown stays local; only the root README is part of the repository.
+*.md
+!/README.md

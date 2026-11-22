@@ -1,0 +1,8 @@
+# Pinned so a local build, CI and a contributor's machine all compile the same
+# Rust. `stable` would drift; a patch-level pin would make security updates
+# tedious. The minor channel is the same choice as the Electron dependency's
+# range.
+[toolchain]
+channel = "1.98"
+components = ["clippy", "rustfmt"]
+profile = "minimal"

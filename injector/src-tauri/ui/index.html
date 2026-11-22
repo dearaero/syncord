@@ -1,0 +1,105 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Syncord Injector</title>
+    <link rel="stylesheet" href="design-tokens.css" />
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <div class="app-shell">
+    <header class="topbar" data-tauri-drag-region>
+      <div class="brand" data-tauri-drag-region>
+        <img class="brand-mark" src="assets/syncord-app-icon.png" width="48" height="48" alt="" data-tauri-drag-region />
+        <div class="brand-copy" data-tauri-drag-region>
+          <strong data-tauri-drag-region>Syncord Injector</strong>
+          <small id="injector-version" data-tauri-drag-region>loading…</small>
+        </div>
+      </div>
+      <div class="window-actions">
+        <button type="button" class="window-button rescan" id="rescan" aria-label="Rescan Discord clients" title="Rescan Discord clients"><span class="control-icon icon-rescan" aria-hidden="true"></span></button>
+        <div class="window-controls" role="group" aria-label="Window controls">
+          <button type="button" class="window-button" id="window-minimize" aria-label="Minimize" title="Minimize"><span class="control-icon icon-minimize" aria-hidden="true"></span></button>
+          <button type="button" class="window-button" id="window-maximize" aria-label="Maximize or restore" title="Maximize or restore"><span class="control-icon icon-maximize" aria-hidden="true"></span></button>
+          <button type="button" class="window-button window-close" id="window-close" aria-label="Close" title="Close"><span class="control-icon icon-close" aria-hidden="true"></span></button>
+        </div>
+      </div>
+    </header>
+
+    <main>
+      <!--
+        The payload banner. Shown before the install list because it decides
+        whether the Inject buttons can work at all, and a user who clicks and
+        then reads an error has been told less than a user who reads this first.
+      -->
+      <section class="banner" id="payload-banner" hidden>
+        <span class="banner-icon" aria-hidden="true">!</span>
+        <p id="payload-message"></p>
+      </section>
+
+      <!--
+        A label and a count, not a heading and a paragraph. The count is the
+        only part that changes between renders, and the only part worth reading
+        before deciding what to press.
+      -->
+      <p id="summary" class="sr-only" role="status" aria-live="polite">Looking for Discord…</p>
+
+      <ul class="installs" id="installs"></ul>
+
+      <section class="empty" id="empty" hidden>
+        <h2>No Discord client found</h2>
+        <p>
+          Syncord installs into an existing Discord. Install Discord from
+          discord.com, close it, then press <strong>Rescan</strong>.
+        </p>
+        <p class="muted">
+          The Microsoft Store build on Windows and Snap on Linux are not supported.
+        </p>
+      </section>
+    </main>
+    </div>
+
+    <!--
+      A native <dialog> rather than a styled div. Escape closes it, focus is
+      trapped, and the browser supplies the semantics — none of which a div and a
+      keydown handler get right by default.
+    -->
+    <dialog id="confirm" class="confirm">
+      <h2 id="confirm-title">Remove Syncord?</h2>
+      <p id="confirm-body"></p>
+      <div class="confirm-actions">
+        <button type="button" class="ghost" id="confirm-cancel">Cancel</button>
+        <button type="button" class="danger" id="confirm-accept">Uninject</button>
+      </div>
+    </dialog>
+
+    <!--
+      The permission helper.
+
+      Shown *before* the user presses anything, and again if a write is refused.
+      Its whole purpose is that the common cause on macOS is a privacy setting
+      the user has to find and change, and finding that out by way of a failed
+      inject — with a message that used to name the wrong setting and suggest a
+      command belonging to a different program — is the version that wastes
+      their time.
+    -->
+    <dialog id="permission" class="permission">
+      <h2 id="permission-title">This Discord cannot be changed yet</h2>
+      <p id="permission-body"></p>
+      <div class="permission-actions">
+        <button type="button" class="ghost" id="permission-close">Close</button>
+        <button type="button" class="ghost" id="permission-recheck">Check again</button>
+        <button type="button" class="primary" id="permission-open" hidden>Open System Settings</button>
+      </div>
+    </dialog>
+
+    <div class="toast" id="toast" hidden role="status" aria-live="polite">
+      <p id="toast-message"></p>
+      <p class="toast-help" id="toast-help" hidden></p>
+      <button type="button" class="ghost" id="toast-close" aria-label="Dismiss">×</button>
+    </div>
+
+    <script type="module" src="app.js"></script>
+  </body>
+</html>

@@ -1,0 +1,46 @@
+[workspace]
+resolver = "2"
+members = ["crates/syncord-core", "src-tauri"]
+
+# Reproducible-ish defaults. `injector/` is a separate workspace from the
+# TypeScript project on purpose: `pnpm verify` must stay fast and must not
+# require a Rust toolchain, while `cargo test` must stay pure Rust with no Node
+# in the loop.
+[workspace.package]
+version = "0.1.5"
+edition = "2021"
+rust-version = "1.77"
+license = "ISC"
+publish = false
+
+[workspace.dependencies]
+ed25519-dalek = { version = "2.1", default-features = false, features = ["std"] }
+sha2 = "0.10"
+base64 = "0.22"
+flate2 = "1"
+tar = "0.4"
+zip = { version = "2.2", default-features = false, features = ["deflate"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+
+# Deny-by-default. `injector/` is outside the reach of scripts/security-scan.mjs
+# (which only walks src/ and scripts/ for .ts/.js/.mjs), so `cargo clippy -D
+# warnings` in CI is the only automated gate on this code. Leaving these loose
+# would mean having no gate at all.
+[workspace.lints.rust]
+unsafe_code = "forbid"
+missing_debug_implementations = "warn"
+
+[workspace.lints.clippy]
+# `unwrap`/`expect` in a tool that writes into an installed application is how a
+# panic becomes a half-written Discord. Every fallible path returns a typed
+# error instead.
+unwrap_used = "deny"
+expect_used = "deny"
+# The first `.unwrap_or_else(|_| PLACEHOLDER)` above is the sanctioned exception:
+# a missing build-time key must fall back to a value that fails verification,
+# never to a panic at compile time.
+or_fun_call = "deny"
+# Error messages are user-facing text, not debug output.
+todo = "deny"
+unimplemented = "deny"

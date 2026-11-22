@@ -1,0 +1,11 @@
+import {h,messageHtml as html} from '../../i18n';
+import {longSettings,LONG_ID,options} from './settings';
+let expanded=false;
+export const isLongExpanded=()=>expanded;
+export function longExpandHtml():string{return `<button type="button" class="dion-icon-btn dion-expand" data-long-expand aria-expanded="${expanded}" aria-label="${h('long.settings')}"><svg width="17" height="17" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="m7.41 8.59 4.59 4.58 4.59-4.58L18 10l-6 6-6-6 1.41-1.41Z"/></svg></button>`;}
+export function longSectionHtml():string{const cfg=options();return `<div class="dion-plugin-details">${(['numbers','confirmLarge'] as const).map(key=>`<label class="dion-setting-row"><span class="dion-setting-title">${html('long.'+key)}</span><span class="dion-switch"><input type="checkbox" role="switch" data-long-option="${key}" aria-label="${h('long.'+key)}" ${cfg[key]?'checked':''}><span class="dion-track" aria-hidden="true"></span></span></label>`).join('')}<label class="dion-setting-row"><span class="dion-setting-title">${html('long.maxParts')}</span><input class="dion-input" type="number" min="2" max="30" step="1" value="${cfg.maxParts}" data-long-option="maxParts" aria-label="${h('long.maxParts')}" style="width:90px"></label><p class="dion-setting-desc">${html('long.hint')}</p></div>`;}
+export function bindLongPanel(root:HTMLElement):()=>void{
+ const click=(event:Event)=>{const button=(event.target as Element|null)?.closest('[data-long-expand]');if(!button)return;event.preventDefault();expanded=!expanded;button.setAttribute('aria-expanded',String(expanded));button.closest('.dion-plugin')?.classList.toggle('is-open',expanded);};
+ const change=(event:Event)=>{const input=event.target;if(!(input instanceof HTMLInputElement))return;const key=input.dataset.longOption,cfg=longSettings.bind(LONG_ID);if(key==='numbers'||key==='confirmLarge')cfg.set(key,input.checked);else if(key==='maxParts'&&Number.isInteger(input.valueAsNumber)&&input.valueAsNumber>=2&&input.valueAsNumber<=30)cfg.set(key,input.valueAsNumber);};
+ root.addEventListener('click',click);root.addEventListener('change',change);return()=>{root.removeEventListener('click',click);root.removeEventListener('change',change);};
+}

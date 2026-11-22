@@ -1,0 +1,16 @@
+# Project-wide thermal defaults. Use scripts/rust.mjs for the single-build lock.
+[build]
+jobs = 2
+
+[profile.dev]
+codegen-units = 1
+[profile.release]
+codegen-units = 1
+[profile.test]
+codegen-units = 1
+[profile.bench]
+codegen-units = 1
+
+[env]
+RAYON_NUM_THREADS = { value = "1", force = true }
+CMAKE_BUILD_PARALLEL_LEVEL = { value = "1", force = true }

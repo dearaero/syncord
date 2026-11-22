@@ -1,0 +1,55 @@
+version: 2
+
+updates:
+  # Runtime and build dependencies. pnpm is pinned exactly in `devEngines`, so
+  # an update here is a deliberate act rather than a range resolution.
+  - package-ecosystem: npm
+    directory: "/"
+    schedule:
+      interval: weekly
+      day: monday
+      time: "06:00"
+    open-pull-requests-limit: 5
+    groups:
+      # Security-relevant transitives move together so a review can see the
+      # whole change rather than three unrelated bumps.
+      electron:
+        patterns:
+          - "electron"
+      build-toolchain:
+        patterns:
+          - "esbuild"
+          - "typescript"
+          - "@types/*"
+    commit-message:
+      prefix: "chore(deps)"
+    labels:
+      - dependencies
+    # Review is the control here; auto-merge is deliberately not enabled for
+    # anything that reaches the Electron runtime.
+    ignore:
+      # devEngines pins the package manager; npm cannot manage it.
+      - dependency-name: "electron"
+        versions: [">=45.0.0"]
+        update-types: ["version-update:semver-minor", "version-update:semver-patch"]
+
+  - package-ecosystem: github-actions
+    directory: "/"
+    schedule:
+      interval: monthly
+    open-pull-requests-limit: 3
+    labels:
+      - dependencies
+      - github-actions
+    commit-message:
+      prefix: "chore(ci)"
+
+  # The workflow itself is a security-critical path (it runs with repository
+  # credentials and produces the build that gets injected).
+  - package-ecosystem: github-actions
+    directory: "/.github/workflows"
+    schedule:
+      interval: weekly
+    labels:
+      - security
+      - github-actions

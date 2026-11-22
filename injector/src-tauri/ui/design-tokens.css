@@ -1,0 +1,19 @@
+/* Syncord Injector UI design tokens — edit freely to match the approved screenshot. */
+:root {
+  --si-bg: #0b0b17;
+  --si-bg-bottom: #17132b;
+  --si-surface: rgba(21, 20, 43, 0.92);
+  --si-surface-menu: rgba(17, 16, 35, 0.97);
+  --si-text: #f5f3ff;
+  --si-muted: #a19fbd;
+  --si-accent: #875cff;
+  --si-accent-strong: #623af0;
+  --si-border: rgba(166, 149, 242, 0.22);
+  --si-border-highlight: rgba(164, 125, 255, 0.46);
+  --si-warning: #ffc25c;
+  --si-radius-window: 26px;
+  --si-radius-card: 38px;
+  --si-radius-menu: 32px;
+  --si-shadow: 0 24px 80px rgba(0, 0, 0, 0.38);
+  --si-font: Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+}

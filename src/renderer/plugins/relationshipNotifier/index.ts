@@ -1,0 +1,1 @@
+export {RelationshipNotifier} from './runtime';

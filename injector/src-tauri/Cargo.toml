@@ -1,0 +1,49 @@
+[package]
+name = "syncord-injector"
+description = "The Syncord Injector: a standalone GUI that installs Syncord into a Discord client."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[[bin]]
+name = "syncord-injector"
+path = "src/main.rs"
+
+[dependencies]
+syncord-core = { path = "../crates/syncord-core" }
+# The command payloads in `state.rs` are plain structs, not `tauri::State` or
+# `tauri::Emitter` types, so the frontend-facing contract is described without
+# the Tauri macro machinery.
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+fs2 = "0.4"
+reqwest = { version = "=0.13.5", default-features = false, features = ["blocking", "native-tls"] }
+
+# Tauri is the GUI shell. Everything it can reach is declared in
+# `capabilities/default.json`, and that file is the security boundary for this
+# process: it grants core defaults and explicit titlebar controls. There is no
+# `fs`, `shell` or `http` plugin, so the frontend cannot read a file, run a
+# process or open a socket — every filesystem operation goes through
+# `syncord-core`, which validates it. No command accepts a path either; they take
+# an index into a list discovered at startup.
+# WKWebView needs Tauri's native transparency support to expose the desktop
+# outside the rounded shell. This grants no additional frontend capability.
+tauri = { version = "2", features = ["macos-private-api"] }
+
+[dev-dependencies]
+flate2.workspace = true
+tar.workspace = true
+# Test-only, and both already in the tree via syncord-core: the integration
+# tests in `src/commands_test.rs` sign a fixture payload and base64-encode the
+# signature, which is what makes them exercise the real verification path rather
+# than a stand-in.
+base64 = { version = "0.22" }
+ed25519-dalek = { version = "2.1", default-features = false, features = ["std"] }
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[lints]
+workspace = true

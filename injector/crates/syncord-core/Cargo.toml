@@ -1,0 +1,29 @@
+[package]
+name = "syncord-core"
+description = "Discord install discovery, signed-payload verification and safe injection for the Syncord Injector."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[lib]
+name = "syncord_core"
+path = "src/lib.rs"
+
+[dependencies]
+ed25519-dalek.workspace = true
+sha2.workspace = true
+base64.workspace = true
+flate2.workspace = true
+tar.workspace = true
+zip.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+
+[build-dependencies]
+# None on purpose: build.rs only reads an env var and re-emits it, so the crate
+# has no build-time dependencies that could execute arbitrary code.
+
+[lints]
+workspace = true

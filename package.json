@@ -1,0 +1,60 @@
+{
+  "name": "Syncord",
+  "version": "0.4.8",
+  "description": "Syncord is a modified client for Discord.",
+  "main": "dist/main.js",
+  "scripts": {
+    "build": "node scripts/build.mjs",
+    "injector:rust": "node scripts/rust.mjs",
+    "injector:build": "node scripts/rust.mjs --allow-build build --release --locked",
+    "typecheck": "tsc --noEmit && tsc -p services/ecosystem/tsconfig.json",
+    "test": "node --test --test-concurrency=1 scripts/tests/body-observer-ui.test.mjs scripts/tests/frame-diagnostics.test.mjs scripts/tests/performance-mode.test.mjs scripts/tests/performance-mode-ui.test.mjs scripts/tests/decoration-layout-ui.test.mjs scripts/tests/profile-discovery-ui.test.mjs scripts/tests/rust-build-policy.test.mjs scripts/tests/fake-dm.test.mjs scripts/tests/fake-dm-ui.test.mjs scripts/tests/fake-dm-projection.test.mjs scripts/tests/platform-identity.test.mjs scripts/tests/platform-spoofer.test.mjs scripts/tests/platform-spoofer-ui.test.mjs scripts/tests/virtual-servers.test.mjs scripts/tests/virtual-servers-ui.test.mjs scripts/tests/server-cloner.test.mjs scripts/tests/server-cloner-ui.test.mjs scripts/tests/long-messages.test.mjs scripts/tests/long-messages-ui.test.mjs scripts/tests/emoji-freedom-ui.test.mjs scripts/tests/emoji-freedom.test.mjs scripts/tests/injector-ui.test.mjs scripts/tests/custom-game-presence.test.mjs scripts/tests/custom-game-presence-ui.test.mjs scripts/tests/drop-inbox.test.mjs scripts/tests/drop-files.test.mjs scripts/tests/drop-worker.test.mjs scripts/tests/drop-electron.test.mjs scripts/tests/drop-ui.test.mjs scripts/tests/settings-controls-ui.test.mjs scripts/tests/experiments.test.mjs scripts/tests/experiments-ui.test.mjs scripts/tests/performance-audit.test.mjs scripts/tests/spotify-controls.test.mjs scripts/tests/spotify-controls-ui.test.mjs scripts/tests/popout-chats.test.mjs scripts/tests/i18n.test.mjs scripts/tests/i18n-ui.test.mjs scripts/tests/ecosystem-worker.test.mjs scripts/tests/ecosystem-updates.test.mjs scripts/tests/ecosystem-svg.test.mjs scripts/tests/ecosystem-png.test.mjs scripts/tests/ecosystem-soft-delete.test.mjs scripts/tests/ecosystem-admin.test.mjs scripts/tests/ecosystem-admin-ui.test.mjs scripts/tests/ecosystem-main.test.mjs scripts/tests/ecosystem-badges.test.mjs scripts/tests/ecosystem-profiles.test.mjs scripts/tests/ecosystem-ui.test.mjs scripts/tests/log-hydration-electron.test.mjs scripts/tests/renderer-memory.test.mjs scripts/tests/memory.test.mjs scripts/tests/memory-log.test.mjs scripts/tests/time-machine.test.mjs scripts/tests/memory-electron.test.mjs scripts/tests/statistics.test.mjs scripts/tests/statistics-network.test.mjs scripts/tests/statistics-ui.test.mjs scripts/tests/statistics-electron.test.mjs scripts/tests/security.test.mjs scripts/tests/security-main.test.mjs scripts/tests/privacy.test.mjs scripts/tests/privacy-electron.test.mjs scripts/tests/image-zoom.test.mjs scripts/tests/image-zoom-ui.test.mjs scripts/tests/relationship-notifier.test.mjs scripts/tests/relationship-notifier-actions.test.mjs scripts/tests/relationship-notifier-ui.test.mjs scripts/tests/plugin-policy.test.mjs scripts/tests/titlebar.test.mjs scripts/tests/titlebar-layout.test.mjs scripts/tests/titlebar-update.test.mjs scripts/tests/plugin-manager.test.mjs scripts/tests/plugin-bulk.test.mjs scripts/tests/plugin-bulk-ui.test.mjs scripts/tests/security-scan.test.mjs scripts/tests/boot-smoke.test.mjs scripts/tests/boot-real-electron.test.mjs scripts/tests/mark-all-as-read.mjs scripts/tests/update.test.mjs scripts/tests/release-pipeline.test.mjs scripts/tests/packaging.test.mjs scripts/tests/icons.test.mjs scripts/tests/user-messages.test.mjs scripts/tests/discord-events.test.mjs scripts/tests/account-panel-regression.test.mjs scripts/tests/show-badges.test.mjs scripts/tests/show-badges-ui.test.mjs scripts/tests/platform-indicators.test.mjs scripts/tests/platform-indicators-ui.test.mjs scripts/tests/dm-filters.test.mjs scripts/tests/dm-filters-ui.test.mjs scripts/tests/hidden-items.test.mjs scripts/tests/hidden-items-ui.test.mjs scripts/tests/smart-upload.test.mjs scripts/tests/smart-upload-ui.test.mjs scripts/tests/global-message-search.test.mjs scripts/tests/global-message-search-ui.test.mjs scripts/tests/dm-closer.test.mjs scripts/tests/dm-closer-ui.test.mjs scripts/tests/copy-banner-ui.test.mjs scripts/tests/background-plugins.test.mjs scripts/tests/logger-attachments.test.mjs scripts/tests/user-activity.test.mjs scripts/tests/user-activity-ui.test.mjs scripts/tests/user-activity-history.test.mjs scripts/tests/toast-ui.test.mjs scripts/tests/release-gates.test.mjs scripts/tests/release-preflight.test.mjs scripts/tests/release-config.test.mjs scripts/tests/update-e2e.test.mjs scripts/tests/update-ui.test.mjs scripts/tests/update-scheduler.test.mjs scripts/tests/notes.test.mjs scripts/tests/notes-ui.test.mjs scripts/tests/screen-recorder.test.mjs scripts/tests/screen-recorder-ui.test.mjs scripts/tests/message-cleaner.test.mjs scripts/tests/message-cleaner-ui.test.mjs scripts/tests/captcha-solver.test.mjs scripts/tests/auto-quest-claim.test.mjs scripts/tests/auto-quest-panel.test.mjs scripts/tests/discord-hcaptcha.test.mjs scripts/tests/supporter-worker.test.mjs scripts/tests/supporter-main.test.mjs scripts/tests/supporter-ui.test.mjs scripts/tests/supporter-validation.test.mjs",
+    "security:scan": "node scripts/security-scan.mjs",
+    "verify": "pnpm typecheck && pnpm test && pnpm security:scan && pnpm build",
+    "release:check": "node scripts/release.mjs --check",
+    "package:payload": "node scripts/package-payload.mjs",
+    "release:preflight": "node scripts/release-preflight.mjs",
+    "release": "node scripts/release.mjs",
+    "injector:package": "node injector/scripts/package.mjs",
+    "watch": "node scripts/build.mjs --watch",
+    "dev": "node scripts/build.mjs --watch --sync",
+    "sync": "node scripts/inject.mjs sync",
+    "inject": "node scripts/build.mjs && node scripts/inject.mjs inject",
+    "uninject": "node scripts/inject.mjs uninject",
+    "ecosystem:setup": "pnpm -C services/ecosystem install --frozen-lockfile --ignore-scripts",
+    "ecosystem:test": "node --test --test-concurrency=1 scripts/tests/ecosystem-worker.test.mjs scripts/tests/ecosystem-updates.test.mjs scripts/tests/ecosystem-svg.test.mjs scripts/tests/ecosystem-png.test.mjs scripts/tests/ecosystem-soft-delete.test.mjs scripts/tests/ecosystem-admin.test.mjs scripts/tests/ecosystem-admin-ui.test.mjs scripts/tests/ecosystem-main.test.mjs scripts/tests/ecosystem-badges.test.mjs scripts/tests/ecosystem-profiles.test.mjs scripts/tests/ecosystem-ui.test.mjs scripts/tests/supporter-worker.test.mjs scripts/tests/supporter-main.test.mjs scripts/tests/supporter-ui.test.mjs scripts/tests/supporter-validation.test.mjs",
+    "ecosystem:live": "node scripts/tests/ecosystem-live-client.mjs",
+    "i18n:check": "node scripts/i18n-check.mjs && node scripts/generate-native-i18n.mjs --check",
+    "i18n:generate": "node scripts/generate-native-i18n.mjs",
+    "i18n:test": "node --test scripts/tests/i18n.test.mjs scripts/tests/i18n-ui.test.mjs",
+    "supporter:test": "node --test --test-concurrency=1 scripts/tests/supporter-worker.test.mjs scripts/tests/supporter-main.test.mjs scripts/tests/supporter-ui.test.mjs scripts/tests/supporter-validation.test.mjs"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "devEngines": {
+    "packageManager": {
+      "name": "pnpm",
+      "version": "12.6.0",
+      "onFail": "download"
+    }
+  },
+  "packageManager": "pnpm@12.6.0",
+  "type": "module",
+  "devDependencies": {
+    "@types/node": "^26.6.2",
+    "electron": "^44.4.5",
+    "esbuild": "^0.28.2",
+    "pngjs": "^7.0.0",
+    "react": "19.3.1",
+    "react-dom": "19.3.1",
+    "typescript": "^7.0.2"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/dearaero/syncord.git"
+  },
+  "dependencies": {
+    "marked": "18.1.0"
+  }
+}
