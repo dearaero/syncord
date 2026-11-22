@@ -46,7 +46,7 @@ export const RELEASE_HOSTS = Object.freeze({
 } as const);
 
 /** Public artifact repository; the source repository may be private or separate. */
-export const DEFAULT_RELEASE_REPO = "dearaero/syncord-releases";
+export const DEFAULT_RELEASE_REPO = "dearaero/syncord";
 
 /** GitHub owner and repository: GitHub's own charset, and nothing else. */
 const REPO_PART = /^[A-Za-z0-9](?:[A-Za-z0-9._-]{0,38})$/;

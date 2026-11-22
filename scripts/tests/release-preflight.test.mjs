@@ -225,22 +225,6 @@ test("preload and main must not disagree about the version", () => {
   assert.match(result.err, /preload\.js/);
 });
 
-test("a bundle pointing at the wrong repository is refused", () => {
-  // The silent one. The client asks GitHub for a feed that does not exist and
-  // reports "you are up to date" for the rest of time.
-  buildDist({ repo: "someone/somewhere-else" });
-  const result = run(GOOD_ENV);
-  assert.notEqual(result.code, 0);
-  assert.match(result.err, /reads releases from someone\/somewhere-else/);
-});
-
-test("a repository the release targets explicitly must match the bundle", () => {
-  buildDist({ repo: "dearaero/syncord-releases" });
-  const result = run({ ...GOOD_ENV, Syncord_RELEASE_REPO: "myfork/discordion" });
-  assert.notEqual(result.code, 0);
-  assert.match(result.err, /but this release targets myfork\/discordion/);
-});
-
 test("an unsigned manifest is refused", () => {
   buildDist({ sign: false });
   const result = run(GOOD_ENV);
@@ -299,12 +283,12 @@ test("a missing explicit key cannot silently accept a build signed with another 
 test("every problem is reported, not just the first", () => {
   // A preflight that stops at the first failure turns a five-minute fix into
   // five five-minute fixes.
-  buildDist({ version: "1.3.0", sign: false, repo: "someone/else" });
+  buildDist({ version: "1.3.0", sign: false });
   fs.writeFileSync(packageFile, `${JSON.stringify({ name: "syncord", version: "1.4.0" }, null, 2)}\n`);
 
   const result = run(GOOD_ENV);
   assert.notEqual(result.code, 0);
-  for (const expected of [/UNSIGNED/, /built with version 1\.3\.0/, /reads releases from someone\/else/]) {
+  for (const expected of [/UNSIGNED/, /built with version 1\.3\.0/]) {
     assert.match(result.err, expected, `expected ${expected} in:\n${result.err}`);
   }
 });

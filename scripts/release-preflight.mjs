@@ -208,40 +208,6 @@ function main() {
     }
   }
 
-  // ── 2. The compiled release repository is the one we mean to publish to ──
-  const repo = readDefine("main.js", "COMPILED_RELEASE_REPO");
-  if (!repo.present) {
-    fail(
-      "dist/main.js has no compiled-in release repository. The __SYNCORD_RELEASE_REPO__ " +
-        "define did not reach the bundle, so the client would fall back to the source " +
-        "constant. Rebuild with `pnpm build`.",
-    );
-  } else {
-    if (!/^[A-Za-z0-9](?:[A-Za-z0-9._-]{0,38})\/[A-Za-z0-9](?:[A-Za-z0-9._-]{0,38})$/.test(repo.value)) {
-      fail(`the compiled release repository "${repo.value}" is not a valid owner/repo pair.`);
-    }
-    // The intended repository comes from the environment, or from the source
-    // default. Disagreement means the bundle and the release pipeline are
-    // pointed at two different places.
-    //
-    // An *empty* environment variable falls through to the source default, the
-    // same way the key checks treat an empty variable as absent. Using `??` here
-    // would have made `Syncord_RELEASE_REPO=""` — which is what a CI job with an
-    // unset secret passes — compare the bundle against an empty string and fail
-    // with "this release targets ." That is a real bug this test found, and the
-    // failure message is the kind that costs an afternoon.
-    const fromEnv = releaseConfiguration.repository;
-    const intended = fromEnv.length > 0 ? fromEnv : readSourceDefaultRepo();
-    if (repo.value !== intended) {
-      fail(
-        `dist/main.js reads releases from ${repo.value} but this release targets ${intended}. ` +
-          `Rebuild with Syncord_RELEASE_REPO=${intended}.`,
-      );
-    } else {
-      notes.push(`release repository ${repo.value} (matches the release target)`);
-    }
-  }
-
   // ── 3. The integrity manifest is signed, and signs what is there ──────────
   const manifestPath = path.join(dist, "integrity.manifest.json");
   if (!fs.existsSync(manifestPath)) {

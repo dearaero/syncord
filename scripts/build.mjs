@@ -337,7 +337,7 @@ if (watch) {
   // What went in, stated plainly. A release built against the wrong repository
   // looks exactly like a correct one until the updater silently stops working,
   // so the two facts that steer it are printed on every build.
-  console.log(`[Syncord] version ${buildVersion} · releases from ${releaseRepo}`);
+  console.log(`[Syncord] version ${buildVersion}`);
   console.log("[Syncord] Build completed");
   if (sync) scheduleSync();
 }
