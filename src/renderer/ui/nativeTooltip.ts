@@ -72,3 +72,37 @@ export function mountNativeTooltip(
   let disposed=false;return()=>{if(!disposed){disposed=true;root.unmount();}};
  }catch{return undefined;}
 }
+
+/** Props of the native Tooltip wrapping `anchor` (e.g. the guild list's
+ * "Direct Messages" item), so a sibling control gets the same size, class,
+ * position and delay as Discord's own row. Only plain values are copied. */
+function nativeTooltipOf(anchor:Element):{component:unknown;props:Record<string,unknown>}|undefined{
+ const candidates=[resolveProfileTooltip(),resolveTooltip()].filter(Boolean);
+ let fiber=currentFiberFor(anchor);
+ for(let depth=0;fiber&&depth<64;depth++,fiber=fiber.return??null){
+  const component=candidates.find(c=>fiber?.type===c||fiber?.elementType===c);if(!component)continue;
+  const raw=fiber.memoizedProps??fiber.pendingProps??{},props:Record<string,unknown>={};
+  for(const [key,value] of Object.entries(raw))if(!['text','children','aria-label'].includes(key)&&['string','number','boolean'].includes(typeof value))props[key]=value;
+  return {component,props};
+ }
+ return undefined;
+}
+
+/** Wrap `child` in the same native Tooltip (and App Layer context) that wraps
+ * `anchor`. Undefined when Discord's tooltip or that wrapper cannot be found. */
+export function nativeTooltipLike(
+ anchor:Element,
+ text:string,
+ child:(react:ReactNs,props:Record<string,unknown>)=>unknown,
+):unknown{
+ try{
+  const found=nativeTooltipOf(anchor);if(!found||!ensureReact())return undefined;
+  const react=kit.react;if(!react)return undefined;
+  const Tooltip=found.component;
+  let tree=Tooltip===kit.profileTooltip
+   ?react.createElement(Tooltip,{...found.props,text},child(react,{}))
+   :react.createElement(Tooltip,{...found.props,text},(props:Record<string,unknown>)=>child(react,props??{}));
+  for(const provider of providersFor(anchor))tree=react.createElement(provider.type,{value:provider.value},tree);
+  return tree;
+ }catch{return undefined;}
+}

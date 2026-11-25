@@ -1,7 +1,24 @@
 import { t as i18nText } from "../../i18n";
 import { definePlugin, type PluginContext } from "../../api/plugin";
+import { definePluginSettings } from "../../api/plugin/settingsDef";
+import { sharedDispatcher } from "../../api/discordEvents";
 import { installDmHomeMenu, type DmHomeMenuHandle } from "./menu";
-import { markAllAsRead, type MarkOutcome } from "./readState";
+import { ackChannels, markAllAsRead, type MarkOutcome } from "./readState";
+
+/** Dispatched by the settings panel after it writes this plugin's keys. */
+export const markAllAsReadChangeEvent = "Syncord-mark-all-as-read-change";
+
+/** Arrivals are batched, and acked outside the dispatch that delivered them. */
+const ALWAYS_READ_DELAY_MS = 300;
+
+const settings = definePluginSettings({
+  alwaysRead: {
+    type: "boolean",
+    default: false,
+    get title() { return i18nText("markread.always"); },
+    get description() { return i18nText("markread.always_desc"); },
+  },
+});
 
 /**
  * A short, honest report.
@@ -71,5 +88,80 @@ export const MarkAllAsReadPlugin = definePlugin({
       },
     });
     ctx.disposable(() => handle.dispose());
+
+    const cfg = settings.bind(ctx.plugin.id);
+    const pending = new Set<string>();
+    let timer = 0;
+    const flush = (): void => {
+      timer = 0;
+      const ids = [...pending];
+      pending.clear();
+      try {
+        ackChannels(ids);
+      } catch (err) {
+        ctx.log.warn("always read: ack failed", err);
+      }
+    };
+    const onMessage = (action: Record<string, unknown>): void => {
+      if (cfg.store.alwaysRead !== true) return;
+      const message = action.message as { channel_id?: unknown } | undefined;
+      const id = action.channelId ?? message?.channel_id;
+      if (typeof id !== "string" || !id) return;
+      pending.add(id);
+      if (!timer) timer = window.setTimeout(flush, ALWAYS_READ_DELAY_MS);
+    };
+    // Unread from before (offline, or just switched on) is cleared once, silently.
+    const catchUp = (): void => {
+      if (cfg.store.alwaysRead !== true) return;
+      try {
+        markAllAsRead();
+      } catch (err) {
+        ctx.log.warn("always read: catch-up failed", err);
+      }
+    };
+    const onConnect = (): void => {
+      window.setTimeout(catchUp, 1500);
+    };
+
+    // Plugins can start before Discord's dispatcher exists, so binding retries briefly.
+    let flux: ReturnType<typeof sharedDispatcher>;
+    const bind = (): boolean => {
+      flux = sharedDispatcher();
+      if (!flux) return false;
+      flux.subscribe("MESSAGE_CREATE", onMessage);
+      flux.subscribe("CONNECTION_OPEN", onConnect);
+      return true;
+    };
+    let retry = 0;
+    let giveUp = 0;
+    if (!bind()) {
+      retry = window.setInterval(() => {
+        if (bind()) { window.clearInterval(retry); window.clearTimeout(giveUp); }
+      }, 500);
+      giveUp = window.setTimeout(() => {
+        window.clearInterval(retry);
+        ctx.log.warn("always read unavailable: Discord dispatcher not found");
+      }, 30_000);
+    }
+    ctx.disposable(() => {
+      window.clearInterval(retry);
+      window.clearTimeout(giveUp);
+      flux?.unsubscribe("MESSAGE_CREATE", onMessage);
+      flux?.unsubscribe("CONNECTION_OPEN", onConnect);
+    });
+    ctx.disposable(() => {
+      window.clearTimeout(timer);
+      pending.clear();
+    });
+
+    let wasOn = cfg.store.alwaysRead === true;
+    if (wasOn) catchUp();
+    const onSettings = (): void => {
+      const on = cfg.store.alwaysRead === true;
+      if (on && !wasOn) catchUp();
+      wasOn = on;
+    };
+    window.addEventListener(markAllAsReadChangeEvent, onSettings);
+    ctx.disposable(() => window.removeEventListener(markAllAsReadChangeEvent, onSettings));
   },
 });

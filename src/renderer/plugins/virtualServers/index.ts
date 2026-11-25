@@ -7,13 +7,14 @@ import {workspace,closePicker,type WorkspaceState} from './workspace';
 import {getFiber} from '../../ui/userNames';
 import {showToast,ToastType} from '../../ui/toast';
 import {bindTooltip} from '../../ui/tooltip';
+import {nativeTooltipLike} from '../../ui/nativeTooltip';
 import {isNativeReact,type NativeReact,type ElementLike} from '../dmFilters/native';
 import {accountId,channelFor,channelChoices,channelLabel,guildName,unread,routing,routeLocation,store,type FluxStore} from './discord';
 import {normalizeTrial,reorderChannels,routeFor,VirtualNavigation,type Trial,type ChannelRef} from './model';
 import {isSidebar,projectSidebar,type NativeSidebar} from './projection';
 import {registerTrialService} from './service';
 import {createVirtualMenu} from './menu';
-import {railMountPoint,railStructureChanged} from './rail';
+import {railMountPoint,railStructureChanged,nativeEntryVars,HOME_ITEM} from './rail';
 import {CSS} from './styles';
 
 const RAIL='[data-list-id="guildsnav"]';
@@ -25,7 +26,7 @@ export const VirtualServersPlugin=definePlugin({
 /** Local organization; Discord retains ownership of actual routes and chat. */
 export function startTrial(ctx:PluginContext):void {
  let layoutDirty=true,lastView='',lastRail='';
- let stopped=false,frame=0,account=accountId(),trial:Trial|undefined,root:Root|undefined,host:HTMLElement|undefined,rail:Element|undefined,offTooltip:(()=>void)|undefined;
+ let nativeTip=false,stopped=false,frame=0,account=accountId(),trial:Trial|undefined,root:Root|undefined,host:HTMLElement|undefined,rail:Element|undefined,offTooltip:(()=>void)|undefined;
  let lastRoutingAttempt=-Infinity;
  let navigationApi:ReturnType<typeof routing>,offRoute:(()=>void)|undefined;
  const supported=new WeakSet<NativeSidebar>();
@@ -123,7 +124,15 @@ export function startTrial(ctx:PluginContext):void {
    const states=current?.channels.map(unread)??[],mentions=states.reduce((sum,s)=>sum+s.mentions,0);
    host.hidden=!current;
    const railKey=JSON.stringify([getLocale(),current?.name,navigation.active,mentions,states.some(s=>s.unread),ready()]);
-   if(railKey!==lastRail||remount){lastRail=railKey;root.render(current?r.createElement('button',{type:'button','data-syncord-virtual-open':'','aria-label':current.name,'aria-pressed':navigation.active,'data-unread':states.some(s=>s.unread),'data-virtual-ready':ready(),onClick:(event:{preventDefault:()=>void;stopPropagation:()=>void})=>{event.preventDefault();event.stopPropagation();open();}},current.name.slice(0,2).toLocaleUpperCase(),mentions?r.createElement('small',null,Math.min(mentions,99)):null):null);}
+   if(railKey!==lastRail||remount){lastRail=railKey;
+    const button=(tip:Record<string,unknown>):unknown=>current?r.createElement('button',{...tip,type:'button','data-syncord-virtual-open':'','aria-label':current.name,'aria-pressed':navigation.active,'data-unread':states.some(s=>s.unread),'data-virtual-ready':ready(),onClick:(event:{preventDefault:()=>void;stopPropagation:()=>void})=>{event.preventDefault();event.stopPropagation();(tip.onClick as ((e:unknown)=>void)|undefined)?.(event);open();}},current.name.slice(0,2).toLocaleUpperCase(),mentions?r.createElement('small',null,Math.min(mentions,99)):null):null;
+    // Discord's own guild-list tooltip (same props as Direct Messages); shared tooltip only as fallback.
+    const home=current?rail?.querySelector(HOME_ITEM):undefined;
+    const tree=home?nativeTooltipLike(home,ready()?current?.name??t('virtual.name'):t('virtual.notReady'),(_react,tip)=>button(tip)):undefined;
+    nativeTip=tree!==undefined;if(nativeTip){offTooltip?.();offTooltip=undefined;}
+    root.render(tree??button({}));
+    if(rail&&current)for(const [name,value] of Object.entries(nativeEntryVars(rail,host)))host.style.setProperty(name,value);
+   }
    if(!current){offTooltip?.();offTooltip=undefined;}
    // React commits asynchronously; the shared tooltip binds after commit.
   }
@@ -133,7 +142,7 @@ export function startTrial(ctx:PluginContext):void {
  const observer=new BodyMutationObserver(records=>{
   if(stopped)return;
   const button=host?.querySelector<HTMLElement>('[data-syncord-virtual-open]');
-  if(button&&!offTooltip)offTooltip=bindTooltip(button,()=>ready()?trial?.name??t('virtual.name'):t('virtual.notReady'),{position:'right'});
+  if(button&&!offTooltip&&!nativeTip)offTooltip=bindTooltip(button,()=>ready()?trial?.name??t('virtual.name'):t('virtual.notReady'),{position:'right'});
   if(host&&!host.isConnected){layoutDirty=true;refresh();return;}
   if([...entries.values()].some(node=>!node.isConnected)){layoutDirty=true;refresh();return;}
   if(records.some(record=>railStructureChanged(rail,record))){layoutDirty=true;refresh();return;}

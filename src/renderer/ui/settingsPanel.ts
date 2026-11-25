@@ -15,6 +15,8 @@ import {relationshipExpandButtonHtml,relationshipSectionHtml,bindRelationshipPan
 import {RN_ID} from "../plugins/relationshipNotifier/types";
 import {imageZoomExpandButtonHtml,imageZoomSectionHtml,bindImageZoomPanel,isImageZoomExpanded} from "../plugins/imageZoom/panel";
 import {IMAGE_ZOOM_ID} from "../plugins/imageZoom/settings";
+import {shortcutsExpandButtonHtml,shortcutsSectionHtml,bindShortcutsPanel,isShortcutsExpanded} from "../plugins/shortcutMessages/panel";
+import {SHORTCUTS_ID} from "../plugins/shortcutMessages/settings";
 import {smartUploadExpandButtonHtml,smartUploadSectionHtml,bindSmartUploadPanel,isSmartUploadExpanded} from "../plugins/smartUpload/panel";
 import {SMART_ID} from "../plugins/smartUpload/settings";
 import {hiddenItemsExpandButtonHtml,hiddenItemsSectionHtml,bindHiddenItemsPanel,isHiddenItemsExpanded} from "../plugins/hiddenItems/panel";
@@ -33,6 +35,7 @@ import { bindRecorderPanel, isRecorderExpanded, recorderExpandButtonHtml, record
 import { RECORDER_ID, RECORDER_EVENT } from "../plugins/screenRecorder/settings";
 import {badgesExpandButtonHtml,badgesSectionHtml,bindBadgesPanel,isBadgesExpanded} from "../plugins/showBadges/panel";
 import { hideTypingChangeEvent } from "../plugins/hideTyping";
+import { markAllAsReadChangeEvent } from "../plugins/markAllAsRead";
 import {
   SCHEDULED_PLUGIN_ID,
   isEditing as isScheduledEditing,
@@ -83,10 +86,12 @@ let query = "";
 let loggerOpen = false;
 let sessionRestoreOpen = false;
 let hideTypingOpen = false;
+let markReadOpen = false;
 let autoQuestsOpen = false;
 let disposeRecorderPanel: (() => void) | undefined;
 let disposeRelationshipPanel:(()=>void)|undefined;
 let disposeImageZoomPanel:(()=>void)|undefined;
+let disposeShortcutsPanel:(()=>void)|undefined;
 let disposeSmartUploadPanel:(()=>void)|undefined;
 let settingsControls:SettingsControls|undefined;
 let disposeSpooferPanel:(()=>void)|undefined;
@@ -114,6 +119,7 @@ const SESSION_DONT_ASK_KEY = "plugins.session-restore.data.dontAsk";
 const HIDE_TYPING_EASY_KEY = "plugins.hide-typing.data.easyChange";
 const HIDE_TYPING_MODE_KEY = "plugins.hide-typing.data.typingMode";
 const HIDE_TYPING_MODES = ["hide", "always", "default"] as const;
+const MARK_READ_ALWAYS_KEY = "plugins.mark-all-as-read.data.alwaysRead";
 
 const FLAG_KEYS: Record<string, string> = {
   bots: BOTS_KEY,
@@ -373,6 +379,54 @@ function hideTypingOptionsHtml(): string {
         ${modeField}
       </div>
     </div>`;
+}
+
+function markReadOptionsHtml(): string {
+  const always = settings.get<boolean>(MARK_READ_ALWAYS_KEY, false) === true;
+  return `
+    <div class="dion-plugin-details dion-mark-read-options">
+      <div class="dion-details-head">
+        <div>
+          <span class="dion-eyebrow">${i18nHtml("ui.mark_all_as_read")}</span>
+          <h4>${i18nHtml("markread.heading")}</h4>
+        </div>
+        <span class="dion-details-note">${i18nHtml("ui.changes_are_saved_instantly")}</span>
+      </div>
+
+      <div class="dion-settings-group">
+        <label class="dion-setting-row">
+          <span class="dion-setting-copy">
+            <span class="dion-setting-title">${i18nHtml("markread.always")}</span>
+            <span class="dion-setting-desc">${i18nHtml("markread.always_desc")}</span>
+          </span>
+          <span class="dion-switch">
+            <input
+              type="checkbox"
+              role="switch"
+              data-dion-mark-read-always
+              aria-label="${h("markread.always")}"
+              ${always ? "checked" : ""} data-si18n-aria-label="markread.always"
+            />
+            <span class="dion-track" aria-hidden="true"></span>
+          </span>
+        </label>
+      </div>
+    </div>`;
+}
+
+function markReadExpandButtonHtml(): string {
+  return `
+    <button
+      type="button"
+      class="dion-icon-btn dion-expand"
+      data-dion-mark-read-expand
+      aria-expanded="${markReadOpen ? "true" : "false"}"
+      aria-label="${h("markread.options")}" data-si18n-aria-label="markread.options"
+    >
+      <svg width="17" height="17" viewBox="0 0 24 24" aria-hidden="true">
+        <path fill="currentColor" d="m7.41 8.59 4.59 4.58 4.59-4.58L18 10l-6 6-6-6 1.41-1.41Z"/>
+      </svg>
+    </button>`;
 }
 
 function hideTypingExpandButtonHtml(): string {
@@ -659,6 +713,8 @@ function rowHtml(plugin: PluginPublicInfo): string {
     plugin.id === "show-badges" || plugin.id === PLATFORM_ID ||
     plugin.id === "session-restore" ||
     plugin.id === "hide-typing" ||
+    plugin.id === "mark-all-as-read" ||
+    plugin.id === SHORTCUTS_ID ||
     plugin.id === SCHEDULED_PLUGIN_ID || plugin.id === ACTIVITY_PLUGIN_ID || plugin.id === RECORDER_ID;
   const shell = special ? "div" : "label";
   const details = plugin.id === "platform-spoofer" ? spooferSectionHtml() : plugin.id === "virtual-servers" ? virtualSectionHtml() : plugin.id === "long-messages" ? longSectionHtml() : plugin.id === "custom-game-presence" ? gameSectionHtml() : plugin.id === "syncord-drop" ? dropSectionHtml() : plugin.id === "experiments" ? experimentsSectionHtml() : plugin.id === SPOTIFY_ID ? spotifySectionHtml() : plugin.id === RN_ID ? relationshipSectionHtml() : plugin.id === IMAGE_ZOOM_ID ? imageZoomSectionHtml() : plugin.id === SMART_ID ? smartUploadSectionHtml() : plugin.id === HIDDEN_ID ? hiddenItemsSectionHtml() :
@@ -674,6 +730,10 @@ function rowHtml(plugin: PluginPublicInfo): string {
           ? sessionRestoreOptionsHtml()
           : plugin.id === "hide-typing"
             ? hideTypingOptionsHtml()
+          : plugin.id === "mark-all-as-read"
+            ? markReadOptionsHtml()
+          : plugin.id === SHORTCUTS_ID
+            ? shortcutsSectionHtml()
             : plugin.id === SCHEDULED_PLUGIN_ID
               ? scheduledSectionHtml()
               : plugin.id === ACTIVITY_PLUGIN_ID
@@ -693,6 +753,10 @@ function rowHtml(plugin: PluginPublicInfo): string {
           ? sessionRestoreExpandButtonHtml()
           : plugin.id === "hide-typing"
             ? hideTypingExpandButtonHtml()
+          : plugin.id === "mark-all-as-read"
+            ? markReadExpandButtonHtml()
+          : plugin.id === SHORTCUTS_ID
+            ? shortcutsExpandButtonHtml()
             : plugin.id === SCHEDULED_PLUGIN_ID
               ? scheduledExpandButtonHtml()
               : plugin.id === ACTIVITY_PLUGIN_ID
@@ -722,6 +786,8 @@ function rowHtml(plugin: PluginPublicInfo): string {
       (plugin.id === "show-badges" && isBadgesExpanded()) ||
       (plugin.id === "auto-quests" && autoQuestsOpen) ||
       (plugin.id === "session-restore" && sessionRestoreOpen) ||
+      (plugin.id === "mark-all-as-read" && markReadOpen) ||
+      (plugin.id === SHORTCUTS_ID && isShortcutsExpanded()) ||
       (plugin.id === SCHEDULED_PLUGIN_ID && isScheduledExpanded()) ||
       (plugin.id === ACTIVITY_PLUGIN_ID && isActivityExpanded())
         ? " is-open"
@@ -862,6 +928,7 @@ function bindShell(): void {
   if (root) {
     disposeRelationshipPanel?.();disposeRelationshipPanel=bindRelationshipPanel(root);
     disposeImageZoomPanel?.();disposeImageZoomPanel=bindImageZoomPanel(root);
+    disposeShortcutsPanel?.();disposeShortcutsPanel=bindShortcutsPanel(root);
     disposeSmartUploadPanel?.();disposeSmartUploadPanel=bindSmartUploadPanel(root);
     disposeRecorderPanel?.();
     disposeRecorderPanel = bindRecorderPanel(root);
@@ -971,6 +1038,24 @@ function bindShell(): void {
       "aria-expanded",
       hideTypingOpen ? "true" : "false",
     );
+  });
+
+  root.querySelector("[data-dion-list]")?.addEventListener("click", (event) => {
+    const button = (event.target as Element | null)?.closest?.("[data-dion-mark-read-expand]");
+    if (!(button instanceof HTMLButtonElement)) return;
+    event.preventDefault();
+    event.stopPropagation();
+    hideTooltip();
+    markReadOpen = !markReadOpen;
+    button.closest(".dion-plugin")?.classList.toggle("is-open", markReadOpen);
+    button.setAttribute("aria-expanded", markReadOpen ? "true" : "false");
+  });
+
+  root.querySelector("[data-dion-list]")?.addEventListener("change", (event) => {
+    const input = (event.target as HTMLElement | null)?.closest?.("input[data-dion-mark-read-always]");
+    if (!(input instanceof HTMLInputElement)) return;
+    settings.set(MARK_READ_ALWAYS_KEY, input.checked);
+    window.dispatchEvent(new Event(markAllAsReadChangeEvent));
   });
 
   // ── Scheduled Messages ────────────────────────────────────────────────
@@ -2506,6 +2591,9 @@ function ensureStyles(): void {
     #${ROOT_ID} .dion-ua-choice:hover, #${ROOT_ID} .dion-ua-choice:focus-visible { background: var(--background-modifier-hover); }
     #${ROOT_ID} .dion-ua-options > .dion-setting-desc { margin-block: 8px; overflow-wrap: anywhere; }
     #${ROOT_ID} .dion-ua-options .dion-field-row { flex-wrap: wrap; }
+    #${ROOT_ID} .dion-sc-row { gap: 8px; }
+    #${ROOT_ID} .dion-sc-row input[data-sc-field="key"] { width: 120px; flex: 0 0 120px; }
+    #${ROOT_ID} .dion-sc-row input[data-sc-field="value"] { width: auto; flex: 1 1 auto; min-width: 0; }
     #${ROOT_ID} .dion-ua-options .dion-field-row input { width: 100px; max-width: 100%; min-width: 0; box-sizing: border-box; }
 
 
@@ -3230,6 +3318,7 @@ export function closeSettings(): void {
   disposeHiddenItemsPanel?.();disposeHiddenItemsPanel=undefined;
   disposeRelationshipPanel?.();disposeRelationshipPanel=undefined;
   disposeImageZoomPanel?.();disposeImageZoomPanel=undefined;
+  disposeShortcutsPanel?.();disposeShortcutsPanel=undefined;
   disposeSmartUploadPanel?.();disposeSmartUploadPanel=undefined;
   root.remove();
   root = undefined;

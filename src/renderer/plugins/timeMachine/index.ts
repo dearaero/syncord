@@ -2,7 +2,7 @@ import { definePlugin } from "../../api/plugin";
 import { settings } from "../../api/settings";
 import { BodyMutationObserver } from "../../ui/bodyObserver";
 import { showToast, ToastType } from "../../ui/toast";
-import { getLocale, onLocaleChange, t } from "../../i18n";
+import { canonicalMessage, getLocale, onLocaleChange, t } from "../../i18n";
 import { channelLog, onLogChange, whenLogReady, type LogEntry } from "../messageLogger/log";
 import { buildTimeline, contentAt, createdAt, cutAt, deletedBefore, density, snowflakeAt, stepDelay, type TmEvent } from "./model";
 import { CSS, STRIP_ID } from "./styles";
@@ -60,7 +60,7 @@ function when(at: number): string {
 
 export const TimeMachinePlugin = definePlugin({
   id: "time-machine",
-  name: "Time Machine",
+  name: canonicalMessage("tm.name"),
   get description() { return t("tm.description"); },
   enabledByDefault: false,
   permissions: {

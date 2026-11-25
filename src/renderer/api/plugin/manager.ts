@@ -57,8 +57,27 @@ function enabledKey(id: string): string {
   return `plugins.${id}.enabled`;
 }
 
+/**
+ * Decided once, on the first boot that sees it missing: an empty settings file
+ * is a fresh install, where every plugin starts off until the user enables it.
+ * Existing installs keep each plugin's `enabledByDefault`.
+ */
+const DEFAULTS_OFF_KEY = "pluginDefaults.off";
+let defaultsOff: boolean | undefined;
+
+function pluginsDefaultOff(): boolean {
+  if (defaultsOff !== undefined) return defaultsOff;
+  // Before settings load an empty cache proves nothing, so do not decide yet.
+  if (!settings.isLoaded()) return false;
+  const saved = settings.get<unknown>(DEFAULTS_OFF_KEY);
+  if (typeof saved === "boolean") return (defaultsOff = saved);
+  defaultsOff = Object.keys(settings.getAll()).length === 0;
+  settings.set(DEFAULTS_OFF_KEY, defaultsOff);
+  return defaultsOff;
+}
+
 function isEnabled(def: PluginDefinition): boolean {
-  const fallback = def.enabledByDefault !== false;
+  const fallback = !pluginsDefaultOff() && def.enabledByDefault !== false;
   return settings.get<boolean>(enabledKey(def.id), fallback) !== false;
 }
 

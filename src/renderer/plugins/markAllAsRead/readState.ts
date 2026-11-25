@@ -799,3 +799,26 @@ export function markAllAsRead(): MarkOutcome {
     detail,
   };
 }
+
+/**
+ * Acknowledges just these channels with the same BULK_ACK action as the
+ * menu item. Used by "Always read", which must not touch channels nothing
+ * arrived in. Returns how many channels were acknowledged.
+ */
+export function ackChannels(ids: Iterable<string>): number {
+  const dispatcher = fluxDispatcher();
+  const store = readStateStore();
+  if (typeof dispatcher?.dispatch !== "function" || typeof store?.lastMessageId !== "function") {
+    return 0;
+  }
+  const states: BulkAckState[] = [];
+  for (const id of new Set(ids)) {
+    // Already read (open channel, own message): nothing to send.
+    if (typeof store.hasUnread === "function" && safe(() => store.hasUnread?.(id)) !== true) continue;
+    const messageId = safe(() => store.lastMessageId?.(id));
+    if (typeof messageId === "string" && messageId) states.push({ channelId: id, messageId, readStateType: 0 });
+  }
+  if (states.length === 0) return 0;
+  dispatcher.dispatch({ type: "BULK_ACK", context: "APP", channels: states });
+  return states.length;
+}

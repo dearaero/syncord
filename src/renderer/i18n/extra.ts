@@ -15,6 +15,8 @@ import {dropCatalog} from '../../shared/dropMessages';
 import {experimentsCatalog} from './experiments';
 import {spotifyCatalog} from "./spotify";
 import {popoutCatalog} from "./popout";
+import {markReadCatalog} from "./markRead";
+import {shortcutMessagesCatalog} from "./shortcutMessages";
 import type {Catalog,Locale} from './core';
 const cursor: Record<Locale,string> = {
  'en-US':'Line {line}:{column}', 'es-ES':'Línea {line}:{column}', de:'Zeile {line}:{column}',
@@ -25,4 +27,4 @@ const cursor: Record<Locale,string> = {
  cs:'Řádek {line}, sloupec {column}', vi:'Dòng {line}, cột {column}', ko:'{line}행, {column}열',
  uk:'Рядок {line}, стовпець {column}',
 };
-export function extraCatalog(locale: Locale): Catalog { return {...pluginBulkCatalog(locale),...performanceCatalog(locale),...perfDiagnosticsCatalog(locale),...fakeDMCatalog(locale),...timeMachineCatalog(locale),...platformSpooferCatalog(locale),...supporterCatalog(locale),...virtualServersCatalog(locale),...serverClonerCatalog(locale),...longMessagesCatalog(locale),...emojiFreedomCatalog(locale),...gameCatalog(locale),...dropCatalog(locale),...experimentsCatalog(locale),...spotifyCatalog(locale),...popoutCatalog(locale),...pluginNamesCatalog(locale),'notes.cursor':cursor[locale]}; }
+export function extraCatalog(locale: Locale): Catalog { return {...pluginBulkCatalog(locale),...performanceCatalog(locale),...perfDiagnosticsCatalog(locale),...fakeDMCatalog(locale),...timeMachineCatalog(locale),...platformSpooferCatalog(locale),...supporterCatalog(locale),...virtualServersCatalog(locale),...serverClonerCatalog(locale),...longMessagesCatalog(locale),...emojiFreedomCatalog(locale),...gameCatalog(locale),...dropCatalog(locale),...experimentsCatalog(locale),...spotifyCatalog(locale),...popoutCatalog(locale),...markReadCatalog(locale),...shortcutMessagesCatalog(locale),...pluginNamesCatalog(locale),'notes.cursor':cursor[locale]}; }

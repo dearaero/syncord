@@ -11,6 +11,7 @@ import "./sessionRestore";
 import "./scheduledMessages";
 import "./multiChatCanvas";
 import "./markAllAsRead";
+import "./shortcutMessages";
 
 import "./userActivity";
 

@@ -38,7 +38,7 @@ before(async () => {
     stdin: {
       contents: `
         export { planTargets } from './src/renderer/plugins/markAllAsRead/targets';
-        export { markAllAsRead, resetAckDiscovery } from './src/renderer/plugins/markAllAsRead/readState';
+        export { ackChannels, markAllAsRead, resetAckDiscovery } from './src/renderer/plugins/markAllAsRead/readState';
         export { findDmHome } from './src/renderer/plugins/markAllAsRead/menu';
       `,
       resolveDir: process.cwd(),
@@ -855,4 +855,31 @@ test("markAllAsRead: survives a client with no stores at all", () => {
   const out = mod.markAllAsRead();
   assert.equal(out.ok, false);
   assert.match(out.detail, /not found/);
+});
+
+test("ackChannels (Always read): acks only the given unread channels in one BULK_ACK", () => {
+  const actions = [];
+  const unread = new Set(["c1", "dm1", "c3"]);
+  client({
+    stores: {
+      ReadStateStore: { hasUnread: (id) => unread.has(id), lastMessageId: (id) => `m-${id}` },
+    },
+    flux: { FluxDispatcher: { dispatch: (action) => actions.push(action) } },
+  });
+
+  // c2 is already read (open channel / own message); c3 is unread but got nothing new.
+  assert.equal(mod.ackChannels(["c1", "c2", "dm1", "c1"]), 2);
+  assert.equal(actions.length, 1);
+  assert.deepEqual(actions[0], {
+    type: "BULK_ACK",
+    context: "APP",
+    channels: [
+      { channelId: "c1", messageId: "m-c1", readStateType: 0 },
+      { channelId: "dm1", messageId: "m-dm1", readStateType: 0 },
+    ],
+  });
+
+  // Nothing unread: no dispatch at all.
+  assert.equal(mod.ackChannels(["c2"]), 0);
+  assert.equal(actions.length, 1);
 });

@@ -66,6 +66,10 @@ export function set(key: string, value: unknown): void {
   scheduleWrite();
 }
 
+export function isLoaded(): boolean {
+  return loaded;
+}
+
 export function getAll(): Readonly<SettingsMap> {
   return cache;
 }
@@ -88,5 +92,6 @@ export const settings = {
   get,
   set,
   getAll,
+  isLoaded,
   flush,
 };

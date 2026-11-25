@@ -7,7 +7,7 @@ import {pathToFileURL} from 'node:url';
 const dir=mkdtempSync(tmpdir()+'/syncord-plugin-bulk-');
 await build({stdin:{resolveDir:process.cwd(),contents:`export * from './src/renderer/api/plugin/bulk';export * from './src/renderer/api/plugin/manager';export {createPluginContext} from './src/renderer/api/plugin/context';export {settings} from './src/renderer/api/settings';`},bundle:true,format:'esm',platform:'browser',outfile:dir+'/fixture.mjs',logLevel:'silent'});
 test.after(()=>rmSync(dir,{recursive:true,force:true}));let serial=0;
-async function fixture(saved={}){
+async function fixture(saved={'pluginDefaults.off':false}){
  let persisted=structuredClone(saved),network=0;
  globalThis.window={SyncordNative:{getSettings:async()=>structuredClone(persisted),setSettings:async value=>{persisted=structuredClone(value);},security:{requestNetwork:async()=>{network++;return {ok:true,status:200,text:'',truncated:false};}}}};
  const api=await import(pathToFileURL(dir+'/fixture.mjs').href+'?v='+ ++serial);await api.settings.init();
@@ -62,4 +62,14 @@ test('factory-level changes truthfully request restart when disabled, without fo
  const f=await fixture();f.add('fixture-early',true,{restartOnDisable:true});await f.api.startAll();assert.equal(f.api.pluginsNeedRestart(),false);
  await f.api.applyBulkPlugins('disable');assert.equal(f.api.pluginsNeedRestart(),true);assert.equal(f.api.get('fixture-early').started,false);
  await f.api.applyBulkPlugins('restore');assert.equal(f.api.pluginsNeedRestart(),false);await f.api.setPluginEnabled('fixture-early',false);assert.equal(f.api.pluginsNeedRestart(),true);await f.api.settings.flush();
+});
+test('fresh install: every plugin starts off and the decision is persisted; existing installs keep plugin defaults',async()=>{
+ const fresh=await fixture({});fresh.add('fixture-on',true);fresh.add('fixture-off');await fresh.api.startAll();
+ assert.equal(fresh.api.get('fixture-on').enabled,false);assert.equal(fresh.counts.get('fixture-on').starts,0);
+ assert.equal(fresh.api.settings.get('pluginDefaults.off'),true);
+ await fresh.api.enable('fixture-on');assert.equal(fresh.counts.get('fixture-on').starts,1);
+ await fresh.api.stopAll();
+ const existing=await fixture({'ui.locale':'tr'});existing.add('fixture-on',true);await existing.api.startAll();
+ assert.equal(existing.counts.get('fixture-on').starts,1);assert.equal(existing.api.settings.get('pluginDefaults.off'),false);
+ await existing.api.stopAll();
 });

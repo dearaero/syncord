@@ -1,12 +1,14 @@
 /** Local navigation only. No selectors touch Discord chat, member lists or real guild rows. */
 export const CSS=`
-[data-syncord-virtual-entry]{display:flex;justify-content:center;flex-shrink:0;padding:4px 0}
+[data-syncord-virtual-entry]{--sv-size:var(--syncord-virtual-size,var(--guildbar-avatar-size,40px));position:relative;display:flex;justify-content:var(--syncord-virtual-justify,center);flex-shrink:0;padding:4px 0;padding-inline-start:var(--syncord-virtual-offset,0)}
 [data-syncord-virtual-entry][hidden]{display:none}
-[data-syncord-virtual-entry] button{position:relative;width:var(--guildbar-avatar-size,40px);height:var(--guildbar-avatar-size,40px);border:0;border-radius:50%;background:var(--background-surface-high,var(--background-secondary));color:var(--text-default,var(--text-normal));font:600 14px var(--font-primary);cursor:pointer;transition:border-radius 160ms ease,background 160ms ease}
-[data-syncord-virtual-entry] button:hover,[data-syncord-virtual-entry] button[aria-pressed=true]{border-radius:12px;background:var(--brand-500,#5865f2);color:white}
-[data-syncord-virtual-entry] button[data-unread=true]::before{content:'';position:absolute;inset-inline-start:-10px;top:calc(50% - 3px);width:4px;height:6px;border-radius:4px;background:var(--text-default,white)}
-[data-syncord-virtual-entry] button[aria-pressed=true]::before{content:'';position:absolute;inset-inline-start:-10px;top:8px;width:4px;height:24px;border-radius:4px;background:var(--text-default,white)}
-[data-syncord-virtual-entry] small{position:absolute;bottom:-3px;inset-inline-end:-3px;min-width:16px;border-radius:8px;background:var(--status-danger,#da373c);color:white;font-size:11px;line-height:16px}
+[data-syncord-virtual-entry] button{position:relative;width:var(--sv-size);height:var(--sv-size);padding:0;border:0;border-radius:var(--syncord-virtual-radius,30%);background:var(--syncord-virtual-bg,var(--background-surface-high,var(--background-secondary)));color:var(--text-default,var(--text-normal));font:var(--syncord-virtual-font,500 16px var(--font-primary));cursor:pointer;transition:background 160ms ease,color 160ms ease}
+[data-syncord-virtual-entry] button:hover,[data-syncord-virtual-entry] button[aria-pressed=true]{background:var(--brand-500,#5865f2);color:white}
+[data-syncord-virtual-entry]::before{content:'';position:absolute;inset-inline-start:var(--syncord-virtual-pill,0);top:50%;width:4px;height:0;border-radius:0 4px 4px 0;background:var(--header-primary,var(--text-default,white));transform:translateY(-50%);transition:height 160ms ease}
+[data-syncord-virtual-entry]:has(button[data-unread=true])::before{height:8px}
+[data-syncord-virtual-entry]:has(button:hover)::before{height:calc(var(--sv-size) / 2)}
+[data-syncord-virtual-entry]:has(button[aria-pressed=true])::before{height:var(--sv-size)}
+[data-syncord-virtual-entry] small{position:absolute;bottom:-4px;inset-inline-end:-4px;box-sizing:border-box;min-width:16px;height:16px;padding:0 4px;border-radius:8px;background:var(--status-danger,#da373c);color:white;font:700 12px/16px var(--font-primary);box-shadow:0 0 0 4px var(--background-base-lowest,var(--background-tertiary,#1e1f22))}
 [data-list-id="private-channels-syncord-virtual"]{display:flex;flex:1;min-height:0;min-width:0;overflow:hidden}
 [data-syncord-virtual-sidebar]{display:flex;flex:1;flex-direction:column;min-height:0;min-width:0;width:100%;overflow:hidden;background:var(--background-base-lowest,var(--background-secondary));color:var(--text-default,var(--text-normal,#dbdee1));font:14px var(--font-primary,sans-serif)}
 [data-syncord-virtual-sidebar] header{display:flex;align-items:center;justify-content:space-between;min-height:48px;flex-shrink:0;padding:0 12px;border-bottom:1px solid var(--border-subtle,transparent);font-weight:600;font-size:16px;gap:8px}
@@ -59,5 +61,5 @@ export const CSS=`
 [data-virtual-row][data-virtual-drop=before]::after{top:0}
 [data-virtual-row][data-virtual-drop=after]::after{bottom:0}
 [data-virtual-grip]{align-self:center;color:var(--text-muted,#949ba4)}
-@media(prefers-reduced-motion:reduce){[data-syncord-virtual-entry] button,[data-syncord-virtual-sidebar] button,[data-virtual-picker],[data-virtual-chevron]{transition:none}}
+@media(prefers-reduced-motion:reduce){[data-syncord-virtual-entry] button,[data-syncord-virtual-entry]::before,[data-syncord-virtual-sidebar] button,[data-virtual-picker],[data-virtual-chevron]{transition:none}}
 `;
