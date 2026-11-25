@@ -250,6 +250,37 @@ fn mac_env(temp: &TempDir) -> DiscoveryEnv {
 }
 
 #[test]
+fn macos_launcher_layout_is_found_next_to_a_classic_canary() {
+    // Discord Stable's macOS launcher (2026-11): /Applications/Discord.app is a
+    // stub with launcher.conf and no asar; the real app is the newest
+    // ~/Library/Application Support/discord/app-<version>/Discord.app.
+    let temp = TempDir::new("mac-launcher");
+    let apps = temp.dir("Applications");
+    let stub = apps.join("Discord.app").join("Contents").join("Resources");
+    std::fs::create_dir_all(&stub).unwrap();
+    std::fs::write(stub.join("launcher.conf"), b"channel = \"stable\"").unwrap();
+    make_discord_install(&apps, "Discord Canary.app", true);
+
+    let data = temp.dir("Library/Application Support/discord");
+    for version in ["0.0.9", "0.0.424"] {
+        make_discord_install(&data.join(format!("app-{version}")), "Discord.app", false);
+    }
+    // A newer folder that is still downloading has no asar and must be skipped.
+    std::fs::create_dir_all(data.join("app-0.0.425").join("Discord.app")).unwrap();
+
+    let found = find_installs(&mac_env(&temp)).expect("both installs must be found");
+    assert_eq!(found.len(), 2);
+    assert_eq!(found[0].branch, Branch::Stable);
+    assert!(
+        found[0].resources.ends_with("app-0.0.424/Discord.app/Contents/Resources"),
+        "{}",
+        found[0].resources.display()
+    );
+    assert_eq!(found[1].branch, Branch::Canary);
+    assert!(found[1].injected);
+}
+
+#[test]
 fn finds_each_install_and_reports_its_injected_state() {
     let temp = TempDir::new("find");
     let apps = temp.dir("Applications");

@@ -13,6 +13,7 @@ const BRANCHES = [
   {
     id: "stable",
     mac: ["Discord.app"],
+    macdata: ["discord"],
     win: ["Discord"],
     linux: ["discord", "Discord"],
     flatpak: ["com.discordapp.Discord"],
@@ -20,6 +21,7 @@ const BRANCHES = [
   {
     id: "canary",
     mac: ["Discord Canary.app"],
+    macdata: ["discordcanary"],
     win: ["DiscordCanary"],
     linux: ["discord-canary", "DiscordCanary"],
     flatpak: ["com.discordapp.DiscordCanary"],
@@ -27,6 +29,7 @@ const BRANCHES = [
   {
     id: "ptb",
     mac: ["Discord PTB.app"],
+    macdata: ["discordptb"],
     win: ["DiscordPTB"],
     linux: ["discord-ptb", "DiscordPTB"],
     flatpak: ["com.discordapp.DiscordPTB"],
@@ -34,6 +37,7 @@ const BRANCHES = [
   {
     id: "development",
     mac: ["Discord Development.app"],
+    macdata: ["discorddevelopment"],
     win: ["DiscordDevelopment"],
     linux: ["discord-development", "DiscordDevelopment"],
     flatpak: ["com.discordapp.DiscordDevelopment"],
@@ -74,7 +78,29 @@ function newestAppResources(root) {
     .sort(compareVersions);
 
   for (let i = apps.length - 1; i >= 0; i--) {
-    const resources = path.join(root, `app-${apps[i]}`, "resources");
+    const folder = path.join(root, `app-${apps[i]}`);
+    const resources = path.join(folder, "resources");
+    if (hasAsar(resources)) return resources;
+    const bundled = bundleResources(folder);
+    if (bundled) return bundled;
+  }
+  return null;
+}
+
+/** `Contents/Resources` of the first `.app` inside a macOS launcher `app-*` folder. */
+function bundleResources(folder) {
+  let entries;
+  try {
+    entries = fs.readdirSync(folder, { withFileTypes: true });
+  } catch {
+    return null;
+  }
+  const bundles = entries
+    .filter((entry) => entry.isDirectory() && entry.name.endsWith(".app"))
+    .map((entry) => entry.name)
+    .sort();
+  for (const name of bundles) {
+    const resources = path.join(folder, name, "Contents", "Resources");
     if (hasAsar(resources)) return resources;
   }
   return null;
@@ -108,11 +134,17 @@ export function installCandidates(platform, env, home) {
 
   if (platform === "darwin") {
     const parents = ["/Applications", path.join(home, "Applications")];
+    const support = path.join(home, "Library", "Application Support");
     for (const branch of BRANCHES) {
       for (const parent of parents) {
         for (const name of branch.mac) {
           out.push({ branch: branch.id, root: path.join(parent, name) });
         }
+      }
+      // Discord's macOS launcher (2026-11) leaves only a stub in /Applications
+      // and runs `app-<version>/Discord.app` from here.
+      for (const name of branch.macdata) {
+        out.push({ branch: branch.id, root: path.join(support, name) });
       }
     }
     return out;
@@ -159,7 +191,7 @@ function notFoundError(platform) {
   const lines = ["Discord desktop install not found."];
   if (platform === "darwin") {
     lines.push(
-      "Looked in /Applications and ~/Applications for Discord, Canary, PTB, and Development.",
+      "Looked in /Applications, ~/Applications and ~/Library/Application Support for Discord, Canary, PTB, and Development.",
     );
   } else if (platform === "win32") {
     lines.push(

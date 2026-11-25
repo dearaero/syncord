@@ -75,24 +75,28 @@ impl Branch {
             Self::Custom => &[],
             Self::Stable => &[
                 ("mac", &["Discord.app"]),
+                ("macdata", &["discord"]),
                 ("win", &["Discord"]),
                 ("linux", &["discord", "Discord"]),
                 ("flatpak", &["com.discordapp.Discord"]),
             ],
             Self::Canary => &[
                 ("mac", &["Discord Canary.app"]),
+                ("macdata", &["discordcanary"]),
                 ("win", &["DiscordCanary"]),
                 ("linux", &["discord-canary", "DiscordCanary"]),
                 ("flatpak", &["com.discordapp.DiscordCanary"]),
             ],
             Self::Ptb => &[
                 ("mac", &["Discord PTB.app"]),
+                ("macdata", &["discordptb"]),
                 ("win", &["DiscordPTB"]),
                 ("linux", &["discord-ptb", "DiscordPTB"]),
                 ("flatpak", &["com.discordapp.DiscordPTB"]),
             ],
             Self::Development => &[
                 ("mac", &["Discord Development.app"]),
+                ("macdata", &["discorddevelopment"]),
                 ("win", &["DiscordDevelopment"]),
                 ("linux", &["discord-development", "DiscordDevelopment"]),
                 ("flatpak", &["com.discordapp.DiscordDevelopment"]),
@@ -101,7 +105,8 @@ impl Branch {
     }
 
     /// The bundle names this branch ships under for `kind` (`mac`, `win`,
-    /// `linux` or `flatpak`).
+    /// `linux` or `flatpak`). `macdata` is the folder under
+    /// `~/Library/Application Support` used by Discord's macOS launcher layout.
     fn names_for(self, kind: &str) -> &'static [&'static str] {
         self.ids()
             .iter()
@@ -342,7 +347,7 @@ impl fmt::Display for DiscoveryError {
                 match platform {
                     Platform::MacOs => writeln!(
                         f,
-                        "Looked in /Applications and ~/Applications for Discord, Canary, PTB, and Development."
+                        "Looked in /Applications, ~/Applications and ~/Library/Application Support for Discord, Canary, PTB, and Development."
                     )?,
                     Platform::Windows => {
                         writeln!(
@@ -427,12 +432,33 @@ fn newest_app_resources(root: &Path) -> Option<PathBuf> {
     versions.sort_by(|a, b| compare_versions(a, b));
 
     for version in versions.iter().rev() {
-        let resources = root.join(format!("app-{version}")).join("resources");
+        let folder = root.join(format!("app-{version}"));
+        let resources = folder.join("resources");
         if has_asar(&resources) {
+            return Some(resources);
+        }
+        if let Some(resources) = bundle_resources(&folder) {
             return Some(resources);
         }
     }
     None
+}
+
+/// `Contents/Resources` of the first `.app` bundle (by name) inside a macOS
+/// launcher `app-<version>` folder that still contains an asar.
+fn bundle_resources(folder: &Path) -> Option<PathBuf> {
+    let mut bundles: Vec<PathBuf> = std::fs::read_dir(folder)
+        .ok()?
+        .flatten()
+        .filter(|entry| entry.file_type().map(|t| t.is_dir()).unwrap_or(false))
+        .map(|entry| entry.path())
+        .filter(|path| path.extension().is_some_and(|ext| ext == "app"))
+        .collect();
+    bundles.sort();
+    bundles
+        .into_iter()
+        .map(|bundle| bundle.join("Contents").join("Resources"))
+        .find(|resources| has_asar(resources))
 }
 
 /// Accept a `.app` bundle, a Discord folder, an `app-*` folder, or a resources
@@ -470,6 +496,7 @@ pub fn install_candidates(env: &DiscoveryEnv) -> Vec<Candidate> {
 
     match env.platform {
         Platform::MacOs => {
+            let support = env.home.join("Library").join("Application Support");
             for branch in BRANCHES {
                 for parent in &env.mac_parents {
                     for name in branch.names_for("mac") {
@@ -478,6 +505,14 @@ pub fn install_candidates(env: &DiscoveryEnv) -> Vec<Candidate> {
                             root: parent.join(name),
                         });
                     }
+                }
+                // Discord's macOS launcher (2026-11) leaves only a stub in
+                // /Applications and runs `app-<version>/Discord.app` from here.
+                for name in branch.names_for("macdata") {
+                    out.push(Candidate {
+                        branch,
+                        root: support.join(name),
+                    });
                 }
             }
         }
