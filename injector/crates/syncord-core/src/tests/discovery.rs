@@ -280,6 +280,37 @@ fn macos_launcher_layout_is_found_next_to_a_classic_canary() {
     assert!(found[1].injected);
 }
 
+#[cfg(unix)]
+#[test]
+fn macos_launcher_folder_that_cannot_be_listed_is_probed_by_name() {
+    // macOS blocks listing Discord Stable's data folder but not reaching paths
+    // inside it by name. A mode of 0o311 reproduces that for the current user.
+    use std::os::unix::fs::PermissionsExt;
+    let temp = TempDir::new("mac-launcher-unlistable");
+    temp.dir("Applications");
+    let data = temp.dir("Library/Application Support/discord");
+    for version in ["0.0.9", "0.0.424"] {
+        make_discord_install(&data.join(format!("app-{version}")), "Discord.app", false);
+    }
+    std::fs::create_dir_all(data.join("app-0.0.425").join("Discord.app")).unwrap();
+    let locked = std::fs::Permissions::from_mode(0o311);
+    std::fs::set_permissions(&data, locked).unwrap();
+    let listable = std::fs::read_dir(&data).is_ok();
+
+    let found = find_installs(&mac_env(&temp));
+    std::fs::set_permissions(&data, std::fs::Permissions::from_mode(0o755)).unwrap();
+    if listable {
+        return; // running as root: the lock cannot be reproduced
+    }
+    let found = found.expect("the unlistable install must still be found");
+    assert_eq!(found[0].branch, Branch::Stable);
+    assert!(
+        found[0].resources.ends_with("app-0.0.424/Discord.app/Contents/Resources"),
+        "{}",
+        found[0].resources.display()
+    );
+}
+
 #[test]
 fn finds_each_install_and_reports_its_injected_state() {
     let temp = TempDir::new("find");

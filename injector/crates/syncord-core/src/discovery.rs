@@ -415,7 +415,13 @@ pub fn compare_versions(a: &str, b: &str) -> Ordering {
 /// numeric one wins. Falls back to `None` when the directory cannot be read,
 /// which is the common case for most candidates.
 fn newest_app_resources(root: &Path) -> Option<PathBuf> {
-    let entries = std::fs::read_dir(root).ok()?;
+    let entries = match std::fs::read_dir(root) {
+        Ok(entries) => entries,
+        Err(error) if error.kind() == std::io::ErrorKind::PermissionDenied => {
+            return probe_launcher_resources(root);
+        }
+        Err(_) => return None,
+    };
 
     let mut versions: Vec<String> = Vec::new();
     for entry in entries.flatten() {
@@ -442,6 +448,34 @@ fn newest_app_resources(root: &Path) -> Option<PathBuf> {
         }
     }
     None
+}
+
+/// Highest `app-0.0.<n>` we probe when a folder cannot be listed.
+const LAUNCHER_PROBE_MAX: u32 = 20_000;
+
+/// Find a launcher install inside a folder macOS will not let us list.
+///
+/// macOS 27 tags Discord Stable's `~/Library/Application Support/discord`
+/// (`com.apple.macl`) so other apps cannot list it or its `app-*` folders, yet
+/// paths inside the `.app` bundle stay reachable by name. Discord numbers these
+/// folders `0.0.<n>`, so probe newest-first by name instead of listing.
+fn probe_launcher_resources(root: &Path) -> Option<PathBuf> {
+    const BUNDLES: [&str; 4] = [
+        "Discord.app",
+        "Discord Canary.app",
+        "Discord PTB.app",
+        "Discord Development.app",
+    ];
+    (0..=LAUNCHER_PROBE_MAX).rev().find_map(|n| {
+        let folder = root.join(format!("app-0.0.{n}"));
+        if !folder.exists() {
+            return None;
+        }
+        BUNDLES
+            .iter()
+            .map(|bundle| folder.join(bundle).join("Contents").join("Resources"))
+            .find(|resources| has_asar(resources))
+    })
 }
 
 /// `Contents/Resources` of the first `.app` bundle (by name) inside a macOS

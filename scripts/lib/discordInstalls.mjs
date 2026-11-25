@@ -69,8 +69,10 @@ function newestAppResources(root) {
   let names;
   try {
     names = fs.readdirSync(root, { withFileTypes: true });
-  } catch {
-    return null;
+  } catch (error) {
+    return error?.code === "EPERM" || error?.code === "EACCES"
+      ? probeLauncherResources(root)
+      : null;
   }
   const apps = names
     .filter((entry) => entry.isDirectory() && entry.name.startsWith("app-"))
@@ -83,6 +85,30 @@ function newestAppResources(root) {
     if (hasAsar(resources)) return resources;
     const bundled = bundleResources(folder);
     if (bundled) return bundled;
+  }
+  return null;
+}
+
+const LAUNCHER_PROBE_MAX = 20000;
+const LAUNCHER_BUNDLES = [
+  "Discord.app",
+  "Discord Canary.app",
+  "Discord PTB.app",
+  "Discord Development.app",
+];
+
+/**
+ * macOS 27 blocks listing Discord Stable's launcher folder (`com.apple.macl`)
+ * but not reaching paths inside it by name, so probe `app-0.0.<n>` newest-first.
+ */
+function probeLauncherResources(root) {
+  for (let n = LAUNCHER_PROBE_MAX; n >= 0; n--) {
+    const folder = path.join(root, `app-0.0.${n}`);
+    if (!fs.existsSync(folder)) continue;
+    for (const name of LAUNCHER_BUNDLES) {
+      const resources = path.join(folder, name, "Contents", "Resources");
+      if (hasAsar(resources)) return resources;
+    }
   }
   return null;
 }
