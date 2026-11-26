@@ -51,6 +51,12 @@ export async function handle(request:Request,env:Env,now=Date.now()):Promise<Res
    await grant(db,id,rule,b.eventId,now);
    const event=await db.prepare('SELECT account_id FROM reward_grants WHERE rule_id=? AND event_id=?').bind(rule,b.eventId).first<{account_id:string}>();if(event&&event.account_id!==id)throw new ApiError(409,'idempotency_conflict');return json({accepted:true});
   }
+  if(path==='/internal/profile'&&request.method==='POST'){
+   // Read-only key for the Discord bot, separate from REWARD_API_KEY so a leak cannot grant SP.
+   if(!env.BOT_API_KEY||env.BOT_API_KEY.length<32||!await secretEqual(request.headers.get('authorization')??'','Bearer '+env.BOT_API_KEY))throw new ApiError(401,'server_authorization_required');
+   const b=await body(request);fields(b,['userId']);const id=ecoAccount(b.userId),supporter=await publicSupporterBadges(db,[id]);
+   return json({...await profile(db,id),supporter:supporter[id]??[]});
+  }
   // Before the D1 limiter: a boot-time update check must not cost a database write.
   const update=await updateRoutes(request,env);if(update)return update;
   if(path.startsWith('/v1/supporter-admin/'))throw new ApiError(410,'supporter.adminWebOnly');
