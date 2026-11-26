@@ -12,6 +12,7 @@ import "./scheduledMessages";
 import "./multiChatCanvas";
 import "./markAllAsRead";
 import "./shortcutMessages";
+import "./clientThemes";
 
 import "./userActivity";
 
