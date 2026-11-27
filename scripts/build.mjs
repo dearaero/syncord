@@ -173,8 +173,10 @@ const pngPlugin = {
     }));
 
     build.onLoad({ filter: /.*/, namespace: "png-dataurl" }, (args) => {
-      const shrunk = resizePng(fs.readFileSync(args.path), 128);
-      const data = shrunk.toString("base64");
+      // resizePng pads to a square, which would shrink a wide wordmark to a
+      // thin strip; small assets are inlined untouched.
+      const bytes = fs.readFileSync(args.path);
+      const data = (bytes.length > 64 * 1024 ? resizePng(bytes, 128) : bytes).toString("base64");
       return {
         contents: `export default ${JSON.stringify(`data:image/png;base64,${data}`)};`,
         loader: "js",

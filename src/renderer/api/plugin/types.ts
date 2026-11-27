@@ -44,6 +44,7 @@ export type PluginContext = {
   drop: import("../../../shared/drop").DropBridge;
   popoutChats: import("../../../shared/popoutChats").PopoutBridge;
   /** Available only to the built-in Screen Recorder with its native capability. */
+  ecosystemSelf?: {profile:(account:string)=>Promise<import("../../../shared/ecosystem").EcoProfile>;lookup:(ids:string[])=>Promise<import("../../../shared/ecosystem").EcoLookup>};
   ecosystemBadges?: {art?:import("../ecosystem/art").BadgeImageResolver;lookup:(ids:string[])=>Promise<import("../../../shared/ecosystem").EcoLookup>};
   recording: import("../../../shared/recording").RecordingBridge;
   /** Available only to the built-in Time Machine with `native: ["chat-snapshot"]`. */

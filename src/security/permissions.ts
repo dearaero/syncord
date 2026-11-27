@@ -46,6 +46,12 @@ export const NATIVE_CAPABILITIES = [
   "popout-chats",
   "screen-recording",
   "ecosystem-badges",
+  /**
+   * Notification Island: read the signed-in user's own ecosystem profile (SP
+   * balance, owned badges) and look up which friends use Syncord. Read-only;
+   * the context gates it to the `notification-island` identity.
+   */
+  "ecosystem-profile",
   /** Time Machine: copy a rectangle of the calling Discord page to the clipboard. */
   "chat-snapshot",
   /**

@@ -153,6 +153,13 @@ export function createPluginContext(def: PluginDefinition): PluginContext {
     snapshot:{copy:rect=>snapshotBridge().copy(rect)},
     drop:{availability:1,inbox:(account,available)=>dropBridge().inbox(account,available),connect:async account=>{await settings.flush();return dropBridge().connect(account);},pick:s=>dropBridge().pick(s),invite:(s,r)=>dropBridge().invite(s,r),view:(s,id)=>dropBridge().view(s,id),action:(s,id,a,sdp)=>dropBridge().action(s,id,a,sdp),save:(s,id)=>dropBridge().save(s,id),read:s=>dropBridge().read(s),write:(s,b)=>dropBridge().write(s,b),hash:s=>dropBridge().hash(s),finish:(s,h)=>dropBridge().finish(s,h),reveal:s=>dropBridge().reveal(s),stop:s=>dropBridge().stop(s),subscribe:fn=>dropBridge().subscribe(fn)},
     popoutChats:{connect:account=>popoutBridge().connect(account),open:(session,id,bounds)=>popoutBridge().open(session,id,bounds),stop:session=>popoutBridge().stop(session),publish:(session,id,state)=>popoutBridge().publish(session,id,state),subscribe:listener=>popoutBridge().subscribe(listener)},
+    ecosystemSelf:{profile:async account=>{
+      if(identity!=="notification-island"||!permissions.native?.includes("ecosystem-profile"))throw Error("Ecosystem profile capability denied.");
+      const bridge=window.SyncordNative?.ecosystem;if(!bridge)throw Error("Ecosystem unavailable.");return bridge.profile(account);
+    },lookup:async ids=>{
+      if(identity!=="notification-island"||!permissions.native?.includes("ecosystem-profile"))throw Error("Ecosystem profile capability denied.");
+      return window.SyncordNative?.ecosystem?.lookup(ids)??{};
+    }},
     ecosystemBadges:{art:async image=>{
       if(identity!=="show-badges"||!permissions.native?.includes("ecosystem-badges"))throw Error("Official badge capability denied.");
       const bridge=window.SyncordNative?.ecosystem;if(!bridge?.art)throw Error("Restart Discord after updating Syncord to load badge images.");return bridge.art(image);

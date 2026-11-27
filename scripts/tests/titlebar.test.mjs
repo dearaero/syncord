@@ -36,6 +36,7 @@ const dir = await mkdtemp(path.join(tmpdir(), "dion-titlebar-"));
 const outfile = path.join(dir, "titlebar.mjs");
 
 await build({
+  loader: { ".png": "dataurl" },
   stdin: {
     contents: `export { findBackButton } from './src/renderer/ui/titlebarButton';`,
     resolveDir: process.cwd(),

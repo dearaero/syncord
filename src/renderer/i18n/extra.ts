@@ -14,6 +14,8 @@ import {gameCatalog} from './gamePresence';
 import {dropCatalog} from '../../shared/dropMessages';
 import {experimentsCatalog} from './experiments';
 import {spotifyCatalog} from "./spotify";
+import {islandCatalog} from "./notificationIsland";
+import {safeVoiceCatalog} from "./safeVoiceJoin";
 import {popoutCatalog} from "./popout";
 import {markReadCatalog} from "./markRead";
 import {shortcutMessagesCatalog} from "./shortcutMessages";
@@ -28,4 +30,4 @@ const cursor: Record<Locale,string> = {
  cs:'Řádek {line}, sloupec {column}', vi:'Dòng {line}, cột {column}', ko:'{line}행, {column}열',
  uk:'Рядок {line}, стовпець {column}',
 };
-export function extraCatalog(locale: Locale): Catalog { return {...pluginBulkCatalog(locale),...performanceCatalog(locale),...perfDiagnosticsCatalog(locale),...fakeDMCatalog(locale),...timeMachineCatalog(locale),...platformSpooferCatalog(locale),...supporterCatalog(locale),...virtualServersCatalog(locale),...serverClonerCatalog(locale),...longMessagesCatalog(locale),...emojiFreedomCatalog(locale),...gameCatalog(locale),...dropCatalog(locale),...experimentsCatalog(locale),...spotifyCatalog(locale),...popoutCatalog(locale),...markReadCatalog(locale),...shortcutMessagesCatalog(locale),...clientThemesCatalog(locale),...pluginNamesCatalog(locale),'notes.cursor':cursor[locale]}; }
+export function extraCatalog(locale: Locale): Catalog { return {...pluginBulkCatalog(locale),...performanceCatalog(locale),...perfDiagnosticsCatalog(locale),...fakeDMCatalog(locale),...timeMachineCatalog(locale),...platformSpooferCatalog(locale),...supporterCatalog(locale),...virtualServersCatalog(locale),...serverClonerCatalog(locale),...longMessagesCatalog(locale),...emojiFreedomCatalog(locale),...gameCatalog(locale),...dropCatalog(locale),...experimentsCatalog(locale),...spotifyCatalog(locale),...islandCatalog(locale),...safeVoiceCatalog(locale),...popoutCatalog(locale),...markReadCatalog(locale),...shortcutMessagesCatalog(locale),...clientThemesCatalog(locale),...pluginNamesCatalog(locale),'notes.cursor':cursor[locale]}; }

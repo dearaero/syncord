@@ -13,6 +13,8 @@ import {mountEcosystem,unmountEcosystem} from "./ecosystem";
 import {mountStatistics,unmountStatistics} from "./statistics";
 import {relationshipExpandButtonHtml,relationshipSectionHtml,bindRelationshipPanel,isRelationshipExpanded} from "../plugins/relationshipNotifier/panel";
 import {RN_ID} from "../plugins/relationshipNotifier/types";
+import {islandExpandHtml,islandSectionHtml,bindIslandPanel,isIslandExpanded} from "../plugins/notificationIsland/panel";
+import {ISLAND_ID} from "../plugins/notificationIsland/settings";
 import {imageZoomExpandButtonHtml,imageZoomSectionHtml,bindImageZoomPanel,isImageZoomExpanded} from "../plugins/imageZoom/panel";
 import {IMAGE_ZOOM_ID} from "../plugins/imageZoom/settings";
 import {shortcutsExpandButtonHtml,shortcutsSectionHtml,bindShortcutsPanel,isShortcutsExpanded} from "../plugins/shortcutMessages/panel";
@@ -23,7 +25,7 @@ import {hiddenItemsExpandButtonHtml,hiddenItemsSectionHtml,bindHiddenItemsPanel,
 import {HIDDEN_ID} from "../plugins/hiddenItems/settings";
 import {platformsExpandButtonHtml,platformsSectionHtml,bindPlatformsPanel,isPlatformsExpanded} from "../plugins/platformIndicators/panel";
 import {PLATFORM_ID} from "../plugins/platformIndicators/settings";
-import logoUrl from "../../../public/assets/syncord.png";
+import logoUrl from "../../../public/assets/syncord-logo.png";
 import { VERSION } from "../../shared/constants";
 import { createLogger } from "../api/logger";
 import { list } from "../api/plugin/manager";
@@ -90,6 +92,7 @@ let markReadOpen = false;
 let autoQuestsOpen = false;
 let disposeRecorderPanel: (() => void) | undefined;
 let disposeRelationshipPanel:(()=>void)|undefined;
+let disposeIslandPanel:(()=>void)|undefined;
 let disposeImageZoomPanel:(()=>void)|undefined;
 let disposeShortcutsPanel:(()=>void)|undefined;
 let disposeSmartUploadPanel:(()=>void)|undefined;
@@ -707,7 +710,7 @@ function bindAutoClaimInputs(): void {
 function rowHtml(plugin: PluginPublicInfo): string {
   const status = statusOf(plugin);
   const checked = plugin.enabled ? "checked" : "";
-  const special = plugin.id === "platform-spoofer" || plugin.id === "virtual-servers" || plugin.id === "long-messages" || plugin.id === "custom-game-presence" || plugin.id === "syncord-drop" || plugin.id === "experiments" || plugin.id === SPOTIFY_ID || plugin.id === RN_ID || plugin.id === IMAGE_ZOOM_ID || plugin.id === SMART_ID || plugin.id === HIDDEN_ID ||
+  const special = plugin.id === "platform-spoofer" || plugin.id === "virtual-servers" || plugin.id === "long-messages" || plugin.id === "custom-game-presence" || plugin.id === "syncord-drop" || plugin.id === "experiments" || plugin.id === SPOTIFY_ID || plugin.id === ISLAND_ID || plugin.id === RN_ID || plugin.id === IMAGE_ZOOM_ID || plugin.id === SMART_ID || plugin.id === HIDDEN_ID ||
     plugin.id === "message-logger" ||
     plugin.id === "auto-quests" ||
     plugin.id === "show-badges" || plugin.id === PLATFORM_ID ||
@@ -717,7 +720,7 @@ function rowHtml(plugin: PluginPublicInfo): string {
     plugin.id === SHORTCUTS_ID ||
     plugin.id === SCHEDULED_PLUGIN_ID || plugin.id === ACTIVITY_PLUGIN_ID || plugin.id === RECORDER_ID;
   const shell = special ? "div" : "label";
-  const details = plugin.id === "platform-spoofer" ? spooferSectionHtml() : plugin.id === "virtual-servers" ? virtualSectionHtml() : plugin.id === "long-messages" ? longSectionHtml() : plugin.id === "custom-game-presence" ? gameSectionHtml() : plugin.id === "syncord-drop" ? dropSectionHtml() : plugin.id === "experiments" ? experimentsSectionHtml() : plugin.id === SPOTIFY_ID ? spotifySectionHtml() : plugin.id === RN_ID ? relationshipSectionHtml() : plugin.id === IMAGE_ZOOM_ID ? imageZoomSectionHtml() : plugin.id === SMART_ID ? smartUploadSectionHtml() : plugin.id === HIDDEN_ID ? hiddenItemsSectionHtml() :
+  const details = plugin.id === "platform-spoofer" ? spooferSectionHtml() : plugin.id === "virtual-servers" ? virtualSectionHtml() : plugin.id === "long-messages" ? longSectionHtml() : plugin.id === "custom-game-presence" ? gameSectionHtml() : plugin.id === "syncord-drop" ? dropSectionHtml() : plugin.id === "experiments" ? experimentsSectionHtml() : plugin.id === SPOTIFY_ID ? spotifySectionHtml() : plugin.id === ISLAND_ID ? islandSectionHtml() : plugin.id === RN_ID ? relationshipSectionHtml() : plugin.id === IMAGE_ZOOM_ID ? imageZoomSectionHtml() : plugin.id === SMART_ID ? smartUploadSectionHtml() : plugin.id === HIDDEN_ID ? hiddenItemsSectionHtml() :
     plugin.id === PLATFORM_ID ? platformsSectionHtml() :
     plugin.id === RECORDER_ID ? recorderSectionHtml() :
     plugin.id === "message-logger"
@@ -740,7 +743,7 @@ function rowHtml(plugin: PluginPublicInfo): string {
                 ? activitySectionHtml()
                 : "";
 
-  const actions = plugin.id === "platform-spoofer" ? spooferExpandHtml() : plugin.id === "virtual-servers" ? virtualExpandHtml() : plugin.id === "long-messages" ? longExpandHtml() : plugin.id === "custom-game-presence" ? gameExpandHtml() : plugin.id === "syncord-drop" ? dropExpandHtml() : plugin.id === "experiments" ? experimentsExpandHtml() : plugin.id === SPOTIFY_ID ? spotifyExpandHtml() : plugin.id === RN_ID ? relationshipExpandButtonHtml() : plugin.id === IMAGE_ZOOM_ID ? imageZoomExpandButtonHtml() : plugin.id === SMART_ID ? smartUploadExpandButtonHtml() : plugin.id === HIDDEN_ID ? hiddenItemsExpandButtonHtml() :
+  const actions = plugin.id === "platform-spoofer" ? spooferExpandHtml() : plugin.id === "virtual-servers" ? virtualExpandHtml() : plugin.id === "long-messages" ? longExpandHtml() : plugin.id === "custom-game-presence" ? gameExpandHtml() : plugin.id === "syncord-drop" ? dropExpandHtml() : plugin.id === "experiments" ? experimentsExpandHtml() : plugin.id === SPOTIFY_ID ? spotifyExpandHtml() : plugin.id === ISLAND_ID ? islandExpandHtml() : plugin.id === RN_ID ? relationshipExpandButtonHtml() : plugin.id === IMAGE_ZOOM_ID ? imageZoomExpandButtonHtml() : plugin.id === SMART_ID ? smartUploadExpandButtonHtml() : plugin.id === HIDDEN_ID ? hiddenItemsExpandButtonHtml() :
     plugin.id === PLATFORM_ID ? platformsExpandButtonHtml() :
     plugin.id === RECORDER_ID ? recorderExpandButtonHtml() :
     plugin.id === "message-logger"
@@ -777,6 +780,7 @@ function rowHtml(plugin: PluginPublicInfo): string {
       (plugin.id === "experiments" && isExperimentsExpanded()) ||
       (plugin.id === SPOTIFY_ID && isSpotifyExpanded()) ||
       (plugin.id === RN_ID && isRelationshipExpanded()) ||
+      (plugin.id === ISLAND_ID && isIslandExpanded()) ||
       (plugin.id === IMAGE_ZOOM_ID && isImageZoomExpanded()) ||
       (plugin.id === SMART_ID && isSmartUploadExpanded()) ||
       (plugin.id === HIDDEN_ID && isHiddenItemsExpanded()) ||
@@ -927,6 +931,7 @@ function bindShell(): void {
   if(root){disposeDropPanel?.();disposeDropPanel=bindDropPanel(root);}
   if (root) {
     disposeRelationshipPanel?.();disposeRelationshipPanel=bindRelationshipPanel(root);
+    disposeIslandPanel?.();disposeIslandPanel=bindIslandPanel(root);
     disposeImageZoomPanel?.();disposeImageZoomPanel=bindImageZoomPanel(root);
     disposeShortcutsPanel?.();disposeShortcutsPanel=bindShortcutsPanel(root);
     disposeSmartUploadPanel?.();disposeSmartUploadPanel=bindSmartUploadPanel(root);
@@ -1308,7 +1313,7 @@ function mount(): void {
         <div class="dion-sidebar-head">
           <div class="dion-brand-lockup">
             <div class="dion-logo-shell">
-              <img src="${esc(logoUrl)}" alt="" width="34" height="34" />
+              <span class="dion-logo-mark" aria-hidden="true"></span>
             </div>
 
             <div class="dion-brand-copy">
@@ -1830,11 +1835,13 @@ function ensureStyles(): void {
       box-shadow: inset 0 1px 0 rgba(255,255,255,.05);
     }
 
-    #${ROOT_ID} .dion-logo-shell img {
-      width: 30px;
-      height: 30px;
+    /* A mask, not an <img>: the white logo then follows the theme's text colour. */
+    #${ROOT_ID} .dion-logo-mark {
+      width: 24px;
+      height: 24px;
       display: block;
-      object-fit: contain;
+      background: var(--dion-text);
+      -webkit-mask: url("${logoUrl}") center / contain no-repeat;
     }
 
     #${ROOT_ID} .dion-brand-copy {
@@ -3317,6 +3324,7 @@ export function closeSettings(): void {
   disposeSpotifyPanel?.();disposeSpotifyPanel=undefined;
   disposeHiddenItemsPanel?.();disposeHiddenItemsPanel=undefined;
   disposeRelationshipPanel?.();disposeRelationshipPanel=undefined;
+  disposeIslandPanel?.();disposeIslandPanel=undefined;
   disposeImageZoomPanel?.();disposeImageZoomPanel=undefined;
   disposeShortcutsPanel?.();disposeShortcutsPanel=undefined;
   disposeSmartUploadPanel?.();disposeSmartUploadPanel=undefined;

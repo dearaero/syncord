@@ -5,6 +5,7 @@ import { createLogger } from "../api/logger";
 import { onUpdate, updateState } from "../api/updater";
 import { openSettings } from "./settingsPanel";
 import { bindTooltip } from "./tooltip";
+import wordmarkUrl from "../../../public/assets/syncord-wordmark.png";
 
 const log = createLogger("titlebar");
 
@@ -234,6 +235,16 @@ function ensureCss(): void {
       white-space: nowrap;
     }
 
+    /* Masked so the wordmark keeps the button's hover/active text colours. */
+    #${BTN_ID} .dion-titlebar-wordmark {
+      display: block;
+      flex: none; /* an empty box would otherwise shrink to nothing in the flex row */
+      width: 80px;
+      height: 22px;
+      background: currentColor;
+      -webkit-mask: url("${wordmarkUrl}") center / contain no-repeat;
+    }
+
     /*
      * Tiny underline accent.
      *
@@ -319,6 +330,11 @@ function ensureCss(): void {
         padding-inline: 5px;
 
         font-size: 14px;
+      }
+
+      #${BTN_ID} .dion-titlebar-wordmark {
+        width: 69px;
+        height: 19px;
       }
     }
 
@@ -616,7 +632,10 @@ function createButton(): HTMLButtonElement {
 
   const text = document.createElement("span");
   text.className = "dion-titlebar-text";
-  text.textContent = i18nText("ui.syncord");
+  const wordmark = document.createElement("span");
+  wordmark.className = "dion-titlebar-wordmark";
+  wordmark.setAttribute("aria-hidden", "true");
+  text.appendChild(wordmark);
 
   const badge = document.createElement("span");
   badge.className = "dion-titlebar-update";

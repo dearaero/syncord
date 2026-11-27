@@ -39,6 +39,8 @@ import "./relationshipNotifier";
 import "./popoutChats";
 
 import "./spotifyControls";
+import "./notificationIsland";
+import "./safeVoiceJoin";
 
 
 

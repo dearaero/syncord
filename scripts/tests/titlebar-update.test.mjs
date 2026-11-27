@@ -134,6 +134,7 @@ fs.writeFileSync(
 
 const outfile = path.join(dir, "bundle.mjs");
 await build({
+  loader: { ".png": "dataurl" },
   entryPoints: [entry],
   bundle: true,
   platform: "neutral",

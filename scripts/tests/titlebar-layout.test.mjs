@@ -18,6 +18,7 @@ test("titlebar layout: native context stays live on the left, Syncord stays cent
   const dir = mkdtempSync(path.join(tmpdir(), "syncord-titlebar-layout-"));
   try {
     await build({
+      loader: { ".png": "dataurl" },
       stdin: {
         resolveDir: root, loader: "ts",
         contents: `import { installTitlebarButton } from "./src/renderer/ui/titlebarButton";

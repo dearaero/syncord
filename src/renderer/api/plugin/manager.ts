@@ -15,6 +15,8 @@ import {
   type PluginPublicInfo,
 } from "./types";
 
+/** Window event fired when a plugin fails to start; `detail` is `{id, name}`. */
+export const PLUGIN_START_FAILED = "Syncord-plugin-start-failed";
 const log = createLogger("plugins");
 
 /**
@@ -280,6 +282,13 @@ function startOne(rt: Runtime): Promise<void> {
       // Back to `stopped`, not `starting`, so a later enable can retry.
       rt.state = "stopped";
       rt.started = false;
+      // Lets Notification Island surface the failure; carries no error text and
+      // runs last, so a broken listener cannot skip the cleanup above.
+      try {
+        window.dispatchEvent(new CustomEvent(PLUGIN_START_FAILED, { detail: { id: rt.def.id, name: rt.def.name } }));
+      } catch {
+        /* no window in tests, or a listener threw */
+      }
     }
   });
 }
