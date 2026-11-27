@@ -14,6 +14,7 @@ test('messages are classified, and @everyone or own messages never notify',()=>{
   assert.equal(m.classifyMessage(msg({}),me,all,1),'dm');
   assert.equal(m.classifyMessage(msg({}),me,all,3),'dm');
   assert.equal(m.classifyMessage(msg({referenced_message:{author:{id:me}},mentions:[{id:me}]}),me,all,0),'reply');
+  assert.equal(m.classifyMessage(msg({referenced_message:{author:{id:me}},mentions:[]}),me,all,0),undefined,'a silent (no-ping) reply, e.g. a bot answering my command, does not notify');
   assert.equal(m.classifyMessage(msg({mentions:[{id:me}]}),me,all,0),'mention');
   assert.equal(m.classifyMessage(msg({mentions:[me]}),me,all,0),'mention');
   assert.equal(m.classifyMessage(msg({content:'New RELEASE today'}),me,all,0),'keyword');
@@ -83,4 +84,35 @@ test('drain empties the whole queue for read-all but keeps history',()=>{
   for(const id of ['a','b','c'])core.push({id,kind:'mention',title:'t',body:'b',at:1},true);
   assert.deepEqual(core.drain().map(item=>item.id),['a','b','c']);
   assert.equal(core.pending(),0);assert.equal(core.current(),undefined);assert.equal(core.history().length,3);
+});
+
+test('keywords match readable text only, not emoji names or mention ids',()=>{
+  assert.equal(m.matchedKeyword('<:darknes_muttluuuu:123456789012345678>',['mut','1234']),undefined);
+  assert.equal(m.matchedKeyword('hey <@909502563567677440>',['9095']),undefined);
+  assert.equal(m.matchedKeyword('Release is out',['beta','release']),'release');
+});
+
+test('message requests, spam and muted DMs/keywords stay silent like in Discord',()=>{
+  const f={request:false,spam:false,muted:false};
+  assert.equal(m.silencedByDiscord('dm',f),false);
+  assert.equal(m.silencedByDiscord('dm',{...f,request:true}),true,'stranger DM in Message Requests');
+  assert.equal(m.silencedByDiscord('dm',{...f,spam:true}),true);
+  assert.equal(m.silencedByDiscord('dm',{...f,muted:true}),true);
+  assert.equal(m.silencedByDiscord('keyword',{...f,muted:true}),true);
+  assert.equal(m.silencedByDiscord('mention',{...f,muted:true}),false,'pings still get through a mute');
+  assert.equal(m.silencedByDiscord('reply',{...f,muted:true}),false);
+});
+
+test('keywords ignore links and only match from the start of a word',()=>{
+  const link='https://cdn.discordapp.com/attachments/1/2/image.png?ex=6a1b&is=69ff&hm=0ace5b7d9e12c3f4&';
+  assert.equal(m.matchedKeyword(link,['ace','image','cdn']),undefined,'a pasted image link never matches');
+  assert.equal(m.matchedKeyword('bak <'+link+'>',['ace']),undefined);
+  assert.equal(m.matchedKeyword("umut'a sor",['umut']),'umut');
+  assert.equal(m.matchedKeyword('umutcum naber',['umut']),undefined);
+  assert.equal(m.matchedKeyword('31qweqwe',['31']),undefined,'whole words only');
+  assert.equal(m.matchedKeyword('2031',['31']),undefined);
+  assert.equal(m.matchedKeyword("31'i gördün mü",['31']),'31');
+  assert.equal(m.matchedKeyword('xumut',['umut']),undefined);
+  assert.equal(m.matchedKeyword('Şimdi gel',['şimdi']),'şimdi');
+  assert.equal(m.matchedKeyword('c++ soru',['c++']),'c++');
 });

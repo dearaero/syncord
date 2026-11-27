@@ -9,16 +9,32 @@ export function avatarUrl(user:User|undefined):string|undefined{
 export const firstLine=(content:string):string=>content.split('\n').find(line=>line.trim())?.trim().slice(0,140)??'';
 const mentionId=(entry:unknown):unknown=>typeof entry==='string'?entry:(entry as {id?:unknown}|null)?.id;
 
+/**
+ * The first keyword found in what people actually read. Links and mention/emoji markup are not searched
+ * (a CDN link's random hash used to match short keywords), and a keyword must be a whole word: "31" hits
+ * "31 çekti"/"31'i" but not "31qwe" or "2031".
+ */
+export function matchedKeyword(content:string,keywords:readonly string[]):string|undefined{
+  const text=content.replace(/<a?:\w+:\d+>|<(?:@[!&]?|#)\d+>|<?https?:\/\/\S+/gi,' ').toLowerCase();
+  const escape=(word:string):string=>word.replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
+  return keywords.find(word=>new RegExp(`(?:^|[^\\p{L}\\p{N}_])${escape(word)}(?![\\p{L}\\p{N}_])`,'u').test(text));
+}
 /** Which kind a new message is, or undefined when it should not notify. `@everyone`/`@here` never count. */
 export function classifyMessage(message:Message,me:string,cfg:Pick<Options,'enabled'|'keywords'>,channelType:number|undefined):Kind|undefined{
   if(!me||!message.author?.id||message.author.id===me)return undefined;
   if(channelType===1||channelType===3)return cfg.enabled.dm?'dm':undefined;
-  if(cfg.enabled.reply&&message.referenced_message?.author?.id===me)return 'reply';
-  if(cfg.enabled.mention&&(message.mentions??[]).some(entry=>mentionId(entry)===me))return 'mention';
-  const text=(message.content??'').toLowerCase();
-  if(cfg.enabled.keyword&&cfg.keywords.some(word=>text.includes(word)))return 'keyword';
+  // Like Discord: a reply only notifies when it pings (the replied author is then listed in `mentions`); bots usually reply silently.
+  const pinged=(message.mentions??[]).some(entry=>mentionId(entry)===me);
+  if(cfg.enabled.reply&&pinged&&message.referenced_message?.author?.id===me)return 'reply';
+  if(cfg.enabled.mention&&pinged)return 'mention';
+  if(cfg.enabled.keyword&&matchedKeyword(message.content??'',cfg.keywords))return 'keyword';
   return undefined;
 }
+/**
+ * Mirrors Discord's own silence: message requests and spam never notify, and a muted channel/server
+ * only lets through what pings you (mentions, pinged replies).
+ */
+export const silencedByDiscord=(kind:Kind,f:{request:boolean;spam:boolean;muted:boolean}):boolean=>f.request||f.spam||(f.muted&&(kind==='dm'||kind==='keyword'));
 /** A voice state change, given the previous snapshot (undefined: unknown). */
 export function voiceChange(previous:VoiceSnapshot|undefined,next:VoiceSnapshot):'voiceJoin'|'voiceLeave'|'stream'|undefined{
   const was=previous?.channelId??null;

@@ -1,6 +1,6 @@
 {
   "name": "Syncord",
-  "version": "0.5.3",
+  "version": "0.5.4",
   "description": "Syncord is a modified client for Discord.",
   "main": "dist/main.js",
   "scripts": {

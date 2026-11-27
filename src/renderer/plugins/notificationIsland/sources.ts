@@ -6,9 +6,9 @@ import type {PluginContext} from '../../api/plugin';
 import {t} from '../../i18n';
 import {ISLAND_ID,ids,options,readRaw,setOption,type Kind,type Options} from './settings';
 import type {IslandItem} from './core';
-import {avatarUrl,classifyMessage,displayName,firstLine,voiceChange,type Message,type User,type VoiceSnapshot} from './classify';
+import {avatarUrl,classifyMessage,displayName,firstLine,matchedKeyword,silencedByDiscord,voiceChange,type Message,type User,type VoiceSnapshot} from './classify';
 
-type Channel={id?:string;name?:string;type?:number;guild_id?:string;guildId?:string;recipients?:unknown[];rawRecipients?:User[]};
+type Channel={id?:string;name?:string;type?:number;guild_id?:string;guildId?:string;recipients?:unknown[];rawRecipients?:User[];isMessageRequest?:boolean;isSpam?:boolean};
 
 const safe=<T>(fn:()=>T,fallback:T):T=>{try{return fn();}catch{return fallback;}};
 const stores=()=>window.Syncord?.common?.stores;
@@ -26,6 +26,16 @@ export const userLabel=(id:string,guildId?:string):string=>{
 };
 /** How a `<#id>` mention reads; voice channels get a speaker instead of `#`. */
 export const channelLabel=(id:string):string=>{const channel=getChannel(id);return channel?.name?`${VOICE_TYPES.has(channel.type??-1)?'🔊 ':'#'}${channel.name.slice(0,80)}`:'#?';};
+type RequestStore={isMessageRequest?:(id:string)=>boolean;isSpam?:(id:string)=>boolean};
+const byName=(name:string):RequestStore|undefined=>safe(()=>window.Syncord?.webpack?.findByStoreName?.(name) as RequestStore|undefined,undefined);
+/** Message-request / spam / mute facts, each from the channel record or Discord's own store; missing signals count as false. */
+function silenced(kind:Kind,channelId:string,channel:Channel|undefined,guildId:string|undefined):boolean{
+  const request=channel?.isMessageRequest===true||safe(()=>byName('MessageRequestStore')?.isMessageRequest?.(channelId)===true,false);
+  const spam=channel?.isSpam===true||safe(()=>byName('SpamMessageRequestStore')?.isSpam?.(channelId)===true,false);
+  const settings=stores()?.UserGuildSettingsStore as {isChannelMuted?:(guild:string|null,channel:string)=>boolean;isMuted?:(guild:string)=>boolean}|undefined;
+  const muted=safe(()=>settings?.isChannelMuted?.(guildId??null,channelId)===true||(!!guildId&&settings?.isMuted?.(guildId)===true),false);
+  return silencedByDiscord(kind,{request,spam,muted});
+}
 function place(channel:Channel|undefined):string{
   if(!channel)return '';
   const guild=channel.guild_id??channel.guildId;
@@ -48,10 +58,13 @@ export function startSources(ctx:PluginContext,push:(item:IslandItem)=>void):()=
     if(action.optimistic||!message||!channelId)return;
     const channel=getChannel(channelId);
     const kind=classifyMessage(message,currentUserId(),options(),channel?.type);if(!kind||!canViewChannel(channelId))return;
+    if(silenced(kind,channelId,channel,channel?.guild_id??channel?.guildId??message.guild_id))return;
     const focused=safe(()=>(stores()?.SelectedChannelStore as {getChannelId?:()=>string|undefined}|undefined)?.getChannelId?.(),undefined)===channelId&&document.hasFocus();
     if(focused)return;
     const body=firstLine(message.content??'')||(message.attachments?.length?t('island.attachment'):'');
-    emit(kind,{title:displayName(message.author,'?'),body,place:place(channel),avatar:avatarUrl(message.author),channelId,guildId:channel?.guild_id??channel?.guildId??message.guild_id,messageId:message.id});
+    // Says why it notified, so a surprising one can be traced (and a too-broad keyword spotted).
+    const why=kind==='reply'?t('island.whyReply'):kind==='mention'?t('island.whyMention'):kind==='keyword'?t('island.whyKeyword',{v0:matchedKeyword(message.content??'',options().keywords)??''}):'';
+    emit(kind,{title:displayName(message.author,'?'),body,place:[why,place(channel)].filter(Boolean).join(' · ').slice(0,120),avatar:avatarUrl(message.author),channelId,guildId:channel?.guild_id??channel?.guildId??message.guild_id,messageId:message.id});
   });
 
   // Voice: Flux listeners run after the store updated, so the previous state is kept here.
